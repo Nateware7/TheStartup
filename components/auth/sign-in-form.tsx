@@ -106,7 +106,7 @@ export function SignInForm() {
           <label htmlFor="password" className="block text-sm font-medium text-zinc-300">
             Password
           </label>
-          <Link href="/auth/forgot-password" className="text-xs text-zinc-400 hover:text-white transition-colors">
+          <Link href="/auth/password-reset" className="text-xs text-zinc-400 hover:text-white transition-colors">
             Forgot password?
           </Link>
         </div>
@@ -148,7 +148,7 @@ export function SignInForm() {
             Remember Me
           </label>
         </div>
-        <Link href="/auth/forgot-password" className="text-xs text-zinc-400 hover:text-white transition-colors">
+        <Link href="/auth/password-reset" className="text-xs text-zinc-400 hover:text-white transition-colors">
           Forgot password?
         </Link>
       </div>
