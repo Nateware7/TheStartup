@@ -1,14 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState } from 'react';
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { useToast } from "@/hooks/use-toast"
 import { motion } from "framer-motion"
+import { auth, db } from '../../lib/firebaseConfig';
+import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 // Form schema with password confirmation
 const formSchema = z
@@ -26,7 +29,6 @@ type FormData = z.infer<typeof formSchema>
 
 export function SignUpForm() {
   const router = useRouter()
-  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -48,23 +50,27 @@ export function SignUpForm() {
     setIsLoading(true)
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // Create user with email and password
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const user = userCredential.user;
 
-      // Success notification
-      toast({
-        title: "Success",
-        description: "Your account has been created successfully.",
-      })
+      // Send email verification
+      await sendEmailVerification(user);
 
-      // Redirect to sign in page
-      router.push("/auth/signin")
+      // Create a Firestore document
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        email: user.email,
+        role: 'unverified',
+        isVerified: false,
+      });
+
+      // Show success toast
+      toast.success('Check your email to verify');
+      router.push('/verify');
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "An error occurred while creating your account.",
-        variant: "destructive",
-      })
+      // Show error toast
+      toast.error('Error signing up: ' + (error as Error).message);
     } finally {
       setIsLoading(false)
     }

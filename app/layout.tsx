@@ -27,13 +27,22 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en" dir="ltr">
-      <body className={`${inter.variable} ${sora.variable} font-sans dark`}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+    <html suppressHydrationWarning>
+      <body
+        lang="en"
+        dir="ltr"
+        className={`${inter.variable} ${sora.variable} font-sans`}
+      >
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
           <AnimatedBackground>
             <div className="flex min-h-screen flex-col">
               <Navbar />
@@ -45,8 +54,9 @@ export default function RootLayout({
         </ThemeProvider>
       </body>
     </html>
-  )
+  );
 }
+
 
 
 

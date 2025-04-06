@@ -1,31 +1,34 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
-import { Eye, EyeOff, Loader2 } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
-import { useToast } from "@/hooks/use-toast"
-import Link from "next/link"
-import { motion } from "framer-motion"
+import React from 'react';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useForm, SubmitHandler } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { auth, db } from '../../lib/firebaseConfig';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 // Form schema
 const formSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  rememberMe: z.boolean().default(false),
-})
+  rememberMe: z.boolean(), // Ensure this is a required boolean
+});
 
-type FormData = z.infer<typeof formSchema>
+type FormData = z.infer<typeof formSchema>;
 
 export function SignInForm() {
-  const router = useRouter()
-  const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -36,35 +39,45 @@ export function SignInForm() {
     defaultValues: {
       email: "",
       password: "",
-      rememberMe: false,
+      rememberMe: false, // Ensure this matches the schema
     },
-  })
+  });
 
-  const onSubmit = async (data: FormData) => {
-    setIsLoading(true)
+  const onSubmit: SubmitHandler<FormData> = async (data) => {
+    setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // Sign in user with email and password
+      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+      const user = userCredential.user;
 
-      // Success notification
-      toast({
-        title: "Success",
-        description: "You have successfully signed in.",
-      })
+      // Check if email is verified
+      if (!user.emailVerified) {
+        toast.error('Please verify your email before logging in');
+        await signOut(auth);
+        return;
+      }
 
-      // Redirect to dashboard
-      router.push("/dashboard")
+      // Fetch user document from Firestore
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        if (!userData.isVerified) {
+          toast.error('Please verify your email before logging in');
+          await signOut(auth);
+          return;
+        }
+      }
+
+      // Proceed with login
+      toast.success('Successfully logged in');
+      router.push('/dashboard'); // Redirect to a protected route
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Invalid email or password.",
-        variant: "destructive",
-      })
+      toast.error('Error signing in: ' + (error as Error).message);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -158,6 +171,5 @@ export function SignInForm() {
         </motion.button>
       </div>
     </form>
-  )
+  );
 }
-
