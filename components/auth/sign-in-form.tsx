@@ -1,6 +1,6 @@
 "use client"
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, SubmitHandler } from "react-hook-form";
@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { auth, db } from '../../lib/firebaseConfig';
-import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
@@ -29,6 +29,18 @@ export function SignInForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    // Check if user is already logged in
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is already logged in, redirect to dashboard
+        router.push('/dashboard');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   const {
     register,
@@ -148,9 +160,6 @@ export function SignInForm() {
             Remember Me
           </label>
         </div>
-        <Link href="/auth/password-reset" className="text-xs text-zinc-400 hover:text-white transition-colors">
-          Forgot password?
-        </Link>
       </div>
 
       <div className="mt-6">

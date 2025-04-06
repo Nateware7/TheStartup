@@ -3,15 +3,19 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, User, Star } from "lucide-react"
+import { Menu, X, User, Star, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { auth } from "@/lib/firebaseConfig"
+import { onAuthStateChanged, signOut, User as FirebaseUser } from "firebase/auth"
 
 export function Navbar() {
   const pathname = usePathname()
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [user, setUser] = useState<FirebaseUser | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   // Check if we're on an auth page
   const isAuthPage = pathname?.startsWith("/auth")
@@ -29,13 +33,42 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser)
+      setIsLoading(false)
+    })
+    
+    return () => unsubscribe()
+  }, [])
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth)
+    } catch (error) {
+      console.error("Error signing out:", error)
+    }
+  }
+
   const navItems = [
     { name: "Home", href: "/" },
     { name: "Marketplace", href: "/marketplace" },
     { name: "Sell", href: "/sell" },
     { name: "Subscribe", href: "/subscribe" },
-    { name: "My Account", href: "/dashboard" },
+    { name: "My Account", href: "/dashboard", protected: true },
   ]
+
+  // Filter navItems based on auth state
+  const filteredNavItems = navItems.filter(item => 
+    !item.protected || (item.protected && user)
+  )
+
+  // Skeleton placeholder for auth buttons when loading
+  const authButtonsPlaceholder = (
+    <div className="flex items-center space-x-4">
+      <div className="h-9 w-20 animate-pulse rounded-md bg-zinc-800/50"></div>
+    </div>
+  )
 
   return (
     <header
@@ -57,7 +90,7 @@ export function Navbar() {
 
             <nav className="hidden md:block">
               <ul className="flex space-x-8">
-                {navItems.map((item) => (
+                {filteredNavItems.map((item) => (
                   <li key={item.name}>
                     <Link
                       href={item.href}
@@ -94,30 +127,59 @@ export function Navbar() {
               </Tooltip>
             </TooltipProvider>
 
-            <Link href="/auth/signin" className="hidden md:block">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "text-zinc-400 hover:text-white",
-                  pathname === "/auth/signin" && "bg-zinc-800/50 text-white",
-                )}
-              >
-                <User className="mr-2 h-4 w-4" />
-                Sign In
-              </Button>
-            </Link>
+            {isLoading ? (
+              authButtonsPlaceholder
+            ) : user ? (
+              <>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleSignOut}
+                        className="text-zinc-400 hover:text-white"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Sign out of your account</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </>
+            ) : (
+              <>
+                <Link href="/auth/signin" className="hidden md:block">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "text-zinc-400 hover:text-white",
+                      pathname === "/auth/signin" && "bg-zinc-800/50 text-white",
+                    )}
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    Sign In
+                  </Button>
+                </Link>
 
-            <Link href="/auth/signup" className="hidden md:block">
-              <Button
-                className={cn(
-                  "bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700",
-                  pathname === "/auth/signup" && "from-violet-700 to-indigo-700",
+                {!user && (
+                  <Link href="/auth/signup" className="hidden md:block">
+                    <Button
+                      className={cn(
+                        "bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700",
+                        pathname === "/auth/signup" && "from-violet-700 to-indigo-700",
+                      )}
+                    >
+                      Sign Up
+                    </Button>
+                  </Link>
                 )}
-              >
-                Sign Up
-              </Button>
-            </Link>
+              </>
+            )}
 
             <button
               className="rounded-md p-2 text-zinc-400 md:hidden"
@@ -134,7 +196,7 @@ export function Navbar() {
         <div className="fixed inset-0 top-16 z-40 bg-zinc-950/95 backdrop-blur-md md:hidden">
           <nav className="container mx-auto px-4 py-8">
             <ul className="flex flex-col space-y-6">
-              {navItems.map((item) => (
+              {filteredNavItems.map((item) => (
                 <li key={item.name}>
                   <Link
                     href={item.href}
@@ -155,18 +217,33 @@ export function Navbar() {
                   Favorites
                 </Link>
               </li>
-              <li className="pt-4">
-                <Link href="/auth/signin" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button className="w-full" variant={pathname === "/auth/signin" ? "default" : "outline"}>
-                    Sign In
+              {isLoading ? (
+                <li className="pt-4">
+                  <div className="h-10 w-full animate-pulse rounded-md bg-zinc-800/50"></div>
+                </li>
+              ) : !user ? (
+                <>
+                  <li className="pt-4">
+                    <Link href="/auth/signin" onClick={() => setIsMobileMenuOpen(false)}>
+                      <Button className="w-full" variant={pathname === "/auth/signin" ? "default" : "outline"}>
+                        Sign In
+                      </Button>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/auth/signup" onClick={() => setIsMobileMenuOpen(false)}>
+                      <Button className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white">Sign Up</Button>
+                    </Link>
+                  </li>
+                </>
+              ) : (
+                <li className="pt-4">
+                  <Button className="w-full" variant="outline" onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-5 w-5" />
+                    Sign Out
                   </Button>
-                </Link>
-              </li>
-              <li>
-                <Link href="/auth/signup" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white">Sign Up</Button>
-                </Link>
-              </li>
+                </li>
+              )}
             </ul>
           </nav>
         </div>

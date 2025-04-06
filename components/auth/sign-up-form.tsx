@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -9,9 +9,10 @@ import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { motion } from "framer-motion"
 import { auth, db } from '../../lib/firebaseConfig';
-import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendEmailVerification, onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+import Link from "next/link";
 
 // Form schema with password confirmation
 const formSchema = z
@@ -32,6 +33,22 @@ export function SignUpForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isSigningUp, setIsSigningUp] = useState(false)
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // Skip automatic redirect during the signup process
+      if (user && !isSigningUp) {
+        // Only redirect to dashboard if user is verified
+        await user.reload(); // Refresh user data
+        if (user.emailVerified) {
+          router.push('/dashboard');
+        }
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [router, isSigningUp]);
 
   const {
     register,
@@ -48,6 +65,7 @@ export function SignUpForm() {
 
   const onSubmit = async (data: FormData) => {
     setIsLoading(true)
+    setIsSigningUp(true) // Set sign-up flag to prevent auto-redirect
 
     try {
       // Create user with email and password
@@ -71,6 +89,7 @@ export function SignUpForm() {
     } catch (error) {
       // Show error toast
       toast.error('Error signing up: ' + (error as Error).message);
+      setIsSigningUp(false); // Reset sign-up flag on error
     } finally {
       setIsLoading(false)
     }
