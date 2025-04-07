@@ -1,13 +1,183 @@
+"use client";
+
 import Link from "next/link"
 import { ArrowLeft, CheckCircle, Share2 } from "lucide-react"
 import { Navbar } from "@/components/navbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AnimatedBackground } from "@/components/animated-background"
 import { AuctionLog } from "@/components/auction-log"
-import { getProductById } from "@/lib/products"
+import { useState, useEffect } from "react"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebaseConfig"
+import { usePathname } from "next/navigation"
 
-export default function ProductPage({ params }) {
-  const product = getProductById(params.id)
+// NOTE: This component directly accesses params.id which will show warnings in the console
+// In a future version of Next.js, params will need to be unwrapped with React.use()
+// For now, the direct access approach works and the warnings can be ignored
+
+interface Product {
+  id: string;
+  title: string;
+  description: string;
+  longDescription: string;
+  startingBid: number;
+  currentBid: number;
+  price: number;
+  category: string;
+  seller: {
+    id: string;
+    name: string;
+    handle: string;
+    avatar: string;
+    verified: boolean;
+    joinDate: string;
+    sales: number;
+    rating: number;
+  };
+  createdAt: any; // Use appropriate type for Timestamp
+  status: "active" | "sold";
+  bid?: number;
+  auctionLog?: Array<{ username: string; amount: number; timestamp: string; isLeading?: boolean }>;
+}
+
+export default function ProductPage() {
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Get the product ID from the pathname instead of params
+  const pathname = usePathname();
+  const productId = pathname ? pathname.split('/').pop() : '';
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function fetchProduct() {
+      if (!productId) return;
+      
+      try {
+        const docRef = doc(db, "listings", productId);
+        const docSnap = await getDoc(docRef);
+        
+        if (!isMounted) return;
+        
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setProduct({
+            id: docSnap.id,
+            title: data.title || "",
+            description: data.description || "",
+            longDescription: data.longDescription || "",
+            startingBid: data.startingBid || 0,
+            currentBid: data.currentBid || 0,
+            price: data.price || 0,
+            category: data.category || "",
+            seller: {
+              id: data.sellerId || "",
+              name: data.seller?.name || "",
+              handle: data.seller?.handle || "",
+              avatar: data.seller?.avatar || "",
+              verified: data.seller?.verified || false,
+              joinDate: data.seller?.joinDate || "",
+              sales: data.seller?.sales || 0,
+              rating: data.seller?.rating || 0,
+            },
+            createdAt: data.createdAt || new Date(),
+            status: data.status || "active",
+            bid: data.bid,
+            auctionLog: data.auctionLog || [],
+          });
+        } else {
+          setProduct(null);
+        }
+      } catch (error) {
+        console.error("Error fetching product:", error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+    
+    fetchProduct();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [productId]);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <AnimatedBackground>
+        <div className="min-h-screen text-white">
+          <Navbar />
+          <main className="container mx-auto px-4 pt-24 pb-20">
+            <Link
+              href="/marketplace"
+              className="mb-8 inline-flex items-center gap-2 text-zinc-400 transition-colors hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to Marketplace</span>
+            </Link>
+            
+            <div className="rounded-xl bg-zinc-900/50 p-8 shadow-lg backdrop-blur-sm">
+              {/* Loading header */}
+              <div className="mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-zinc-800/80 animate-pulse"></div>
+                  <div>
+                    <div className="h-4 w-32 bg-zinc-800/80 rounded animate-pulse"></div>
+                    <div className="h-3 w-24 bg-zinc-800/80 rounded mt-2 animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="h-6 w-20 rounded-full bg-zinc-800/80 animate-pulse"></div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                {/* Main content loading skeleton */}
+                <div className="lg:col-span-2">
+                  <div className="h-8 w-2/3 bg-zinc-800/80 rounded animate-pulse mb-3"></div>
+                  <div className="h-4 w-full bg-zinc-800/80 rounded animate-pulse mb-6"></div>
+
+                  <div className="mb-6">
+                    <div className="h-6 w-40 bg-zinc-800/80 rounded animate-pulse mb-4"></div>
+                    <div className="space-y-2">
+                      <div className="h-4 w-full bg-zinc-800/80 rounded animate-pulse"></div>
+                      <div className="h-4 w-full bg-zinc-800/80 rounded animate-pulse"></div>
+                      <div className="h-4 w-3/4 bg-zinc-800/80 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right sidebar loading skeleton */}
+                <div className="space-y-6">
+                  {/* Price/Bid card */}
+                  <div className="rounded-xl border border-zinc-800/60 bg-zinc-800/20 p-5 backdrop-blur-sm shadow-lg">
+                    <div className="h-20 bg-zinc-800/50 rounded animate-pulse mb-4"></div>
+                    <div className="h-10 w-full bg-zinc-800/50 rounded animate-pulse"></div>
+                  </div>
+
+                  {/* Seller info card */}
+                  <div className="rounded-xl border border-zinc-800/60 bg-zinc-800/20 p-5 backdrop-blur-sm shadow-lg">
+                    <div className="h-5 w-32 bg-zinc-800/50 rounded animate-pulse mb-4"></div>
+                    <div className="space-y-3">
+                      <div className="h-4 w-full bg-zinc-800/50 rounded animate-pulse"></div>
+                      <div className="h-4 w-full bg-zinc-800/50 rounded animate-pulse"></div>
+                      <div className="h-4 w-full bg-zinc-800/50 rounded animate-pulse"></div>
+                    </div>
+                    <div className="h-10 w-full bg-zinc-800/50 rounded animate-pulse mt-4"></div>
+                  </div>
+
+                  {/* Share button */}
+                  <div className="h-10 w-full bg-zinc-800/30 rounded animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </AnimatedBackground>
+    );
+  }
 
   // Handle case where product is not found
   if (!product) {
@@ -30,19 +200,19 @@ export default function ProductPage({ params }) {
           </main>
         </div>
       </AnimatedBackground>
-    )
+    );
   }
 
   // Determine if this is an auction product
-  const isAuction = product.bid !== null
+  const isAuction = product.bid !== undefined;
 
-  const getInitials = (name) => {
+  const getInitials = (name: string) => {
     return name
       .split(" ")
-      .map((part) => part[0])
+      .map((part: string) => part[0])
       .join("")
-      .toUpperCase()
-  }
+      .toUpperCase();
+  };
 
   return (
     <AnimatedBackground>
@@ -114,7 +284,7 @@ export default function ProductPage({ params }) {
                         </div>
                         <div className="text-right">
                           <div className="text-sm text-zinc-500">Current Bid</div>
-                          <div className="text-2xl font-bold text-emerald-400">${product.bid.toFixed(2)}</div>
+                          <div className="text-2xl font-bold text-emerald-400">${(product.bid || 0).toFixed(2)}</div>
                         </div>
                       </>
                     ) : (
@@ -132,9 +302,9 @@ export default function ProductPage({ params }) {
                           type="number"
                           placeholder="Enter bid amount"
                           className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-white placeholder:text-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                          defaultValue={(product.bid + 5).toFixed(2)}
+                          defaultValue={((product.bid || 0) + 5).toFixed(2)}
                           step="0.01"
-                          min={(product.bid + 0.01).toFixed(2)}
+                          min={((product.bid || 0) + 0.01).toFixed(2)}
                         />
                         <button className="rounded-md bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 font-medium text-white hover:from-emerald-600 hover:to-teal-600">
                           Bid
