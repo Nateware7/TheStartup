@@ -33,6 +33,7 @@ export default function RootLayout({
   return (
     <html suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         lang="en"
         dir="ltr"
         className={`${inter.variable} ${sora.variable} font-sans`}

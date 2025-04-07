@@ -48,9 +48,9 @@ export function UnifiedHero() {
             className="mb-8 flex flex-1 flex-col items-center text-center lg:mb-0 lg:items-start lg:pr-8 lg:text-left"
           >
             <h1 className="mb-6 font-sora text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
-              <span className="block">Digital Marketplace</span>
+              <span className="block">Thameen</span>
               <span className="mt-2 block bg-gradient-to-r from-indigo-400 via-violet-400 to-purple-400 bg-clip-text text-transparent">
-                No Images Required
+              Digital Marketplace
               </span>
             </h1>
 

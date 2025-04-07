@@ -6,20 +6,55 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useSubscription } from "@/hooks/use-subscription"
 import { AccessRestrictedModal } from "@/components/access-restricted-modal"
 
-export function ProductCard({ product }) {
+// Define Product interface based on the actual data structure
+interface Seller {
+  id?: string
+  name: string
+  handle?: string
+  avatar?: string
+  verified?: boolean
+  joinDate?: string
+  sales?: number
+  rating?: number
+}
+
+interface Product {
+  id: string
+  title: string
+  description: string
+  longDescription?: string
+  price: number
+  bid?: number | null
+  startingBid?: number
+  currentBid?: number
+  category: string
+  seller?: Seller
+  stats?: {
+    sales: number
+    lastSold: string
+  }
+  auctionLog?: Array<{
+    username: string
+    amount: number
+    timestamp: string
+    isLeading?: boolean
+  }>
+}
+
+export function ProductCard({ product }: { product: Product }) {
   const { canPerformAction, subscriptionTier } = useSubscription()
   const [showModal, setShowModal] = useState(false)
   const [actionType, setActionType] = useState<"buy" | "bid" | null>(null)
 
   if (!product) return null
 
-  const getInitials = (name) => {
+  const getInitials = (name: string) => {
     // Handle @ symbol in usernames
     const nameWithoutAt = name.startsWith("@") ? name.substring(1) : name
 
     return nameWithoutAt
       .split(/\s+/)
-      .map((part) => part[0])
+      .map((part: string) => part[0])
       .join("")
       .toUpperCase()
   }
@@ -79,11 +114,11 @@ export function ProductCard({ product }) {
                 <div className="flex justify-between items-end">
                   <div>
                     <div className="text-[10px] text-zinc-500">Starting Bid</div>
-                    <div className="text-xs text-zinc-300">${product.startingBid.toFixed(2)}</div>
+                    <div className="text-xs text-zinc-300">${product.startingBid?.toFixed(2) || '0.00'}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-[10px] text-zinc-500">Current Bid</div>
-                    <div className="text-sm font-bold text-emerald-400">${product.currentBid.toFixed(2)}</div>
+                    <div className="text-sm font-bold text-emerald-400">${product.currentBid?.toFixed(2) || '0.00'}</div>
                   </div>
                 </div>
               </>
@@ -115,12 +150,6 @@ export function ProductCard({ product }) {
               </button>
             </Link>
           </div>
-        </div>
-
-        {/* Stats */}
-        <div className="bg-zinc-900/60 px-4 py-2 text-[10px] text-zinc-500 flex items-center justify-between">
-          <div>Total sales: {product.stats?.sales ? product.stats.sales.toLocaleString() : "0"}</div>
-          <div>Last sold: {product.stats?.lastSold || "Never"}</div>
         </div>
       </div>
 
