@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AnimatedBackground } from "@/components/animated-background"
 import { AuctionLog } from "@/components/auction-log"
 import { useState, useEffect } from "react"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebaseConfig"
 import { usePathname } from "next/navigation"
 
@@ -43,6 +43,9 @@ interface Product {
 export default function ProductPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [bidAmount, setBidAmount] = useState<number | "">("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   
   // Get the product ID from the pathname instead of params
   const pathname = usePathname();
@@ -104,6 +107,25 @@ export default function ProductPage() {
       isMounted = false;
     };
   }, [productId]);
+
+  const handleBid = async () => {
+    if (!product) return;
+    if (typeof bidAmount !== "number" || bidAmount <= product.currentBid) {
+      setError("Bid must be higher than the current bid.");
+      return;
+    }
+
+    try {
+      const productRef = doc(db, "listings", product.id);
+      await updateDoc(productRef, { currentBid: bidAmount });
+      setProduct((prev) => prev && { ...prev, currentBid: bidAmount });
+      setSuccess("Bid placed successfully!");
+      setError(null);
+    } catch (err) {
+      console.error("Error placing bid:", err);
+      setError("Failed to place bid. Please try again.");
+    }
+  };
 
   // Show loading state
   if (loading) {
@@ -204,7 +226,7 @@ export default function ProductPage() {
   }
 
   // Determine if this is an auction product
-  const isAuction = product.bid !== undefined;
+  const isAuction = product.startingBid !== undefined && product.currentBid !== undefined;
 
   const getInitials = (name: string) => {
     return name
@@ -280,11 +302,11 @@ export default function ProductPage() {
                       <>
                         <div>
                           <div className="text-sm text-zinc-500">Starting Price</div>
-                          <div className="text-lg font-bold">${product.price.toFixed(2)}</div>
+                          <div className="text-lg font-bold">${product.startingBid.toFixed(2)}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-sm text-zinc-500">Current Bid</div>
-                          <div className="text-2xl font-bold text-emerald-400">${(product.bid || 0).toFixed(2)}</div>
+                          <div className="text-2xl font-bold text-emerald-400">${product.currentBid.toFixed(2)}</div>
                         </div>
                       </>
                     ) : (
@@ -302,14 +324,20 @@ export default function ProductPage() {
                           type="number"
                           placeholder="Enter bid amount"
                           className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-white placeholder:text-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                          defaultValue={((product.bid || 0) + 5).toFixed(2)}
+                          value={bidAmount}
+                          onChange={(e) => setBidAmount(parseFloat(e.target.value) || "")}
                           step="0.01"
-                          min={((product.bid || 0) + 0.01).toFixed(2)}
+                          min={((product.currentBid || 0) + 0.01).toFixed(2)}
                         />
-                        <button className="rounded-md bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 font-medium text-white hover:from-emerald-600 hover:to-teal-600">
+                        <button
+                          onClick={handleBid}
+                          className="rounded-md bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 font-medium text-white hover:from-emerald-600 hover:to-teal-600"
+                        >
                           Bid
                         </button>
                       </div>
+                      {error && <div className="text-red-500 text-sm">{error}</div>}
+                      {success && <div className="text-green-500 text-sm">{success}</div>}
                       <div className="text-sm text-zinc-500">
                         Auction ends in <span className="text-white font-medium">2 days 14 hours</span>
                       </div>
