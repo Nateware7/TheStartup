@@ -27,7 +27,7 @@ const Verify: React.FC = () => {
           await updateDoc(userDoc, { isVerified: true });
           console.log('Firestore document updated');
           toast.success('Email verified successfully!');
-          router.push('/auth/signin');
+          router.push('/profile-setup');
         } catch (error) {
           console.error('Error updating Firestore:', error);
           toast.error('Failed to update verification status.');

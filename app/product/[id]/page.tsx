@@ -302,17 +302,17 @@ export default function ProductPage() {
                       <>
                         <div>
                           <div className="text-sm text-zinc-500">Starting Price</div>
-                          <div className="text-lg font-bold">${product.startingBid.toFixed(2)}</div>
+                          <div className="text-lg font-bold">${typeof product.startingBid === 'number' ? product.startingBid.toFixed(2) : '0.00'}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-sm text-zinc-500">Current Bid</div>
-                          <div className="text-2xl font-bold text-emerald-400">${product.currentBid.toFixed(2)}</div>
+                          <div className="text-2xl font-bold text-emerald-400">${typeof product.currentBid === 'number' ? product.currentBid.toFixed(2) : '0.00'}</div>
                         </div>
                       </>
                     ) : (
                       <div>
                         <div className="text-sm text-zinc-500">Price</div>
-                        <div className="text-2xl font-bold">${product.price.toFixed(2)}</div>
+                        <div className="text-2xl font-bold">${typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}</div>
                       </div>
                     )}
                   </div>
@@ -327,7 +327,7 @@ export default function ProductPage() {
                           value={bidAmount}
                           onChange={(e) => setBidAmount(parseFloat(e.target.value) || "")}
                           step="0.01"
-                          min={((product.currentBid || 0) + 0.01).toFixed(2)}
+                          min={(typeof product.currentBid === 'number' ? product.currentBid + 0.01 : 0.01).toFixed(2)}
                         />
                         <button
                           onClick={handleBid}

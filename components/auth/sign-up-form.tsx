@@ -81,6 +81,22 @@ export function SignUpForm() {
         email: user.email,
         role: 'unverified',
         isVerified: false,
+        profilePicture: '',
+        bio: '',
+        location: '',
+        followers: 0,
+        following: 0,
+        sales: 0,
+        rating: 0,
+        badges: [],
+        createdAt: new Date(),
+        lastLogin: new Date(),
+        subscriptionTier: 'none',
+        notifications: {
+          email: true,
+          push: true,
+          marketing: false
+        },
       });
 
       // Show success toast

@@ -114,11 +114,11 @@ export function ProductCard({ product }: { product: Product }) {
                 <div className="flex justify-between items-end">
                   <div>
                     <div className="text-[10px] text-zinc-500">Starting Bid</div>
-                    <div className="text-xs text-zinc-300">${product.startingBid?.toFixed(2) || '0.00'}</div>
+                    <div className="text-xs text-zinc-300">${typeof product.startingBid === 'number' ? product.startingBid.toFixed(2) : '0.00'}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-[10px] text-zinc-500">Current Bid</div>
-                    <div className="text-sm font-bold text-emerald-400">${product.currentBid?.toFixed(2) || '0.00'}</div>
+                    <div className="text-sm font-bold text-emerald-400">${typeof product.currentBid === 'number' ? product.currentBid.toFixed(2) : '0.00'}</div>
                   </div>
                 </div>
               </>

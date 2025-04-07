@@ -163,9 +163,9 @@ export function EnhancedFooter() {
               animate={{ opacity: mounted ? 1 : 0, y: mounted ? 0 : 20 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              <h3 className="mb-4 font-sora text-lg font-semibold text-white">About Thameen</h3>
+              <h3 className="mb-4 font-sora text-lg font-semibold text-white">About Bixt</h3>
               <p className="mb-4 text-sm leading-relaxed text-zinc-400">
-                Thameen is a revolutionary digital marketplace focused on the quality and value of digital products
+                Bixt is a revolutionary digital marketplace focused on the quality and value of digital products
                 rather than flashy visuals. We connect creators with buyers in a secure, transparent environment.
               </p>
               <Link
@@ -233,7 +233,7 @@ export function EnhancedFooter() {
                 transition={{ duration: 0.5, delay: 0.4 }}
                 className="text-sm text-zinc-500"
               >
-                © Thameen 2025. Powered by <span className="text-zinc-400">DigitalVentures</span>
+                © Bixt 2025. Powered by <span className="text-zinc-400">DigitalVentures</span>
               </motion.div>
 
               <motion.div
