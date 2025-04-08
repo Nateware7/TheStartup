@@ -77,10 +77,6 @@ export function CategoryTagCarousel() {
           </button>
         )}
 
-        {/* Gradient fades */}
-        <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-12 bg-gradient-to-r from-zinc-950 to-transparent" />
-        <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-12 bg-gradient-to-l from-zinc-950 to-transparent" />
-
         {/* Centered container for category pills */}
         <div className="flex justify-center">
           <div

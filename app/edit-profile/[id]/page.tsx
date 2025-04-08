@@ -94,6 +94,13 @@ function EditProfileContent({ userId }: { userId: string }) {
         return
       }
       
+      // Check if email is verified
+      if (!user.emailVerified) {
+        toast.error("Please verify your email before editing your profile")
+        router.push('/verify')
+        return
+      }
+      
       try {
         // Fetch the user's current profile data
         const userDoc = await getDoc(doc(db, 'users', user.uid))

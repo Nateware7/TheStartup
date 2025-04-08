@@ -116,14 +116,6 @@ export function ProfileSetupForm() {
       const user = auth.currentUser;
       if (!user) throw new Error("User not authenticated");
       
-      // Check if user is verified
-      if (!user.emailVerified) {
-        toast.error("Please verify your email before setting up your profile");
-        router.push('/verify');
-        setIsLoading(false);
-        return;
-      }
-
       // Prepare update data
       const updateData: Record<string, any> = {
         username: data.username,
