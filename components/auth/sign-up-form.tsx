@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { motion } from "framer-motion"
 import { auth, db } from '../../lib/firebaseConfig';
@@ -34,6 +34,7 @@ export function SignUpForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSigningUp, setIsSigningUp] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -66,6 +67,7 @@ export function SignUpForm() {
   const onSubmit = async (data: FormData) => {
     setIsLoading(true)
     setIsSigningUp(true) // Set sign-up flag to prevent auto-redirect
+    setFormError(null) // Clear previous errors
 
     try {
       // Create user with email and password
@@ -103,8 +105,25 @@ export function SignUpForm() {
       toast.success('Check your email to verify');
       router.push('/verify');
     } catch (error) {
-      // Show error toast
-      toast.error('Error signing up: ' + (error as Error).message);
+      // Handle specific Firebase auth errors
+      const errorCode = (error as any)?.code;
+      let errorMessage = '';
+      
+      if (errorCode === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already registered. Please sign in instead.';
+      } else if (errorCode === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (errorCode === 'auth/weak-password') {
+        errorMessage = 'Password is too weak. Please use a stronger password.';
+      } else if (errorCode === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else {
+        errorMessage = 'Error signing up: ' + (error as Error).message;
+      }
+      
+      // Set form error and show toast
+      setFormError(errorMessage);
+      toast.error(errorMessage);
       setIsSigningUp(false); // Reset sign-up flag on error
     } finally {
       setIsLoading(false)
@@ -113,6 +132,14 @@ export function SignUpForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {/* Form-level error message */}
+      {formError && (
+        <div className="rounded-md bg-red-500/10 border border-red-500/50 p-3 flex items-start gap-2">
+          <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-red-500">{formError}</p>
+        </div>
+      )}
+      
       <div className="space-y-2">
         <label htmlFor="email" className="block text-sm font-medium text-zinc-300">
           Email

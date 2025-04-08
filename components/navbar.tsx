@@ -45,6 +45,8 @@ export function Navbar() {
   const handleSignOut = async () => {
     try {
       await signOut(auth)
+      // Force page refresh to ensure all components update properly
+      window.location.href = "/"
     } catch (error) {
       console.error("Error signing out:", error)
     }

@@ -166,10 +166,10 @@ export function SellForm() {
                       </SelectTrigger>
                       <SelectContent className="border-zinc-700 bg-zinc-800 text-white">
                         <SelectItem value="instagram">Instagram</SelectItem>
-                        <SelectItem value="twitter">Twitter</SelectItem>
+                        <SelectItem value="x">X</SelectItem>
                         <SelectItem value="tiktok">TikTok</SelectItem>
-                        <SelectItem value="snapchat">Snapchat</SelectItem>
-                        <SelectItem value="youtube">YouTube</SelectItem>
+                        <SelectItem value="telegram">Telegram</SelectItem>
+                        <SelectItem value="discord">Discord</SelectItem>
                         <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>

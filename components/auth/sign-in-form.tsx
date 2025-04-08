@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
@@ -29,6 +29,7 @@ export function SignInForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -57,6 +58,7 @@ export function SignInForm() {
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     setIsLoading(true);
+    setFormError(null); // Clear previous errors
 
     try {
       // Sign in user with email and password
@@ -65,7 +67,9 @@ export function SignInForm() {
 
       // Check if email is verified
       if (!user.emailVerified) {
-        toast.error('Please verify your email before logging in');
+        const message = 'Please verify your email before logging in';
+        setFormError(message);
+        toast.error(message);
         await signOut(auth);
         return;
       }
@@ -75,7 +79,9 @@ export function SignInForm() {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         if (!userData.isVerified) {
-          toast.error('Please verify your email before logging in');
+          const message = 'Please verify your email before logging in';
+          setFormError(message);
+          toast.error(message);
           await signOut(auth);
           return;
         }
@@ -85,7 +91,26 @@ export function SignInForm() {
       toast.success('Successfully logged in');
       router.push('/dashboard'); // Redirect to a protected route
     } catch (error) {
-      toast.error('Error signing in: ' + (error as Error).message);
+      // Handle specific authentication errors
+      const errorCode = (error as any)?.code;
+      let errorMessage = '';
+      
+      if (errorCode === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email address';
+      } else if (errorCode === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password';
+      } else if (errorCode === 'auth/invalid-credential') {
+        errorMessage = 'Invalid email or password';
+      } else if (errorCode === 'auth/invalid-email') {
+        errorMessage = 'Invalid email format';
+      } else if (errorCode === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed login attempts. Please try again later';
+      } else {
+        errorMessage = 'Error signing in: ' + (error as Error).message;
+      }
+      
+      setFormError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -93,6 +118,14 @@ export function SignInForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {/* Form-level error message */}
+      {formError && (
+        <div className="rounded-md bg-red-500/10 border border-red-500/50 p-3 flex items-start gap-2">
+          <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-red-500">{formError}</p>
+        </div>
+      )}
+      
       <div className="space-y-2">
         <label htmlFor="email" className="block text-sm font-medium text-zinc-300">
           Email

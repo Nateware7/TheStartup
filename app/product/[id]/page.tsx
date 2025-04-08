@@ -10,6 +10,7 @@ import { useState, useEffect } from "react"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebaseConfig"
 import { usePathname } from "next/navigation"
+import { format } from "date-fns"
 
 // NOTE: This component directly accesses params.id which will show warnings in the console
 // In a future version of Next.js, params will need to be unwrapped with React.use()
@@ -65,6 +66,41 @@ export default function ProductPage() {
         
         if (docSnap.exists()) {
           const data = docSnap.data();
+          
+          // Get seller information
+          let sellerInfo = {
+            id: data.sellerId || "",
+            name: "Anonymous",
+            handle: "@user",
+            avatar: "/placeholder.svg?height=200&width=200",
+            verified: false,
+            joinDate: "Unknown",
+            sales: 0,
+            rating: 0,
+          };
+          
+          // Fetch seller details from the users collection
+          if (data.sellerId) {
+            try {
+              const sellerDoc = await getDoc(doc(db, "users", data.sellerId));
+              if (sellerDoc.exists()) {
+                const sellerData = sellerDoc.data();
+                sellerInfo = {
+                  id: data.sellerId,
+                  name: sellerData.username || sellerData.displayName || "Anonymous",
+                  handle: sellerData.handle || `@${sellerData.username?.toLowerCase().replace(/\s+/g, '') || 'user'}`,
+                  avatar: sellerData.profilePicture || sellerData.photoURL || "/placeholder.svg?height=200&width=200",
+                  verified: sellerData.isVerified || false,
+                  joinDate: sellerData.createdAt ? format(sellerData.createdAt.toDate(), 'MMMM yyyy') : "Unknown",
+                  sales: sellerData.sales || 0,
+                  rating: sellerData.rating || 0,
+                };
+              }
+            } catch (error) {
+              console.error("Error fetching seller info:", error);
+            }
+          }
+          
           setProduct({
             id: docSnap.id,
             title: data.title || "",
@@ -74,16 +110,7 @@ export default function ProductPage() {
             currentBid: data.currentBid || 0,
             price: data.price || 0,
             category: data.category || "",
-            seller: {
-              id: data.sellerId || "",
-              name: data.seller?.name || "",
-              handle: data.seller?.handle || "",
-              avatar: data.seller?.avatar || "",
-              verified: data.seller?.verified || false,
-              joinDate: data.seller?.joinDate || "",
-              sales: data.seller?.sales || 0,
-              rating: data.seller?.rating || 0,
-            },
+            seller: sellerInfo,
             createdAt: data.createdAt || new Date(),
             status: data.status || "active",
             bid: data.bid,

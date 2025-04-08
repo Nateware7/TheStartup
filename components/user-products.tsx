@@ -6,16 +6,33 @@ import Link from "next/link"
 import { Heart, Loader } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { db } from "@/lib/firebaseConfig"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore"
+import { ProductCard } from "@/components/product-card"
 
 // Define product type
 type Product = {
   id: string
   title: string
   type: string
+  category: string
+  description: string
+  longDescription?: string
   price: number
-  bid: number | null
-  image: string
+  startingBid?: number
+  currentBid?: number
+  bid?: number | null
+  image?: string
+  sellerId?: string
+  seller?: {
+    id: string
+    name: string
+    handle?: string
+    avatar?: string
+    verified?: boolean
+    joinDate?: string
+    sales?: number
+    rating?: number
+  }
 }
 
 interface UserProductsProps {
@@ -43,11 +60,38 @@ export function UserProducts({ userId }: UserProductsProps) {
             id: doc.id,
             title: data.title || "Untitled Product",
             type: data.category || "Other",
+            category: data.category || "Other",
+            description: data.description || "",
+            longDescription: data.longDescription || "",
             price: data.price || 0,
+            startingBid: data.startingBid,
+            currentBid: data.currentBid,
             bid: data.currentBid || null,
-            image: data.image || "/placeholder.svg?height=600&width=600"
+            image: data.image || "/placeholder.svg?height=600&width=600",
+            sellerId: userId
           })
         })
+        
+        // Get the user information
+        const userDoc = await getDoc(doc(db, "users", userId))
+        if (userDoc.exists()) {
+          const userData = userDoc.data()
+          const sellerInfo = {
+            id: userId,
+            name: userData.username || userData.displayName || "Anonymous",
+            handle: userData.handle || `@${(userData.username || 'user').toLowerCase().replace(/\s+/g, '')}`,
+            avatar: userData.profilePicture || userData.photoURL || "/placeholder.svg?height=200&width=200",
+            verified: userData.isVerified || false,
+            joinDate: userData.createdAt ? new Date(userData.createdAt.toDate()).toLocaleDateString() : "Unknown",
+            sales: userData.sales || 0,
+            rating: userData.rating || 0,
+          }
+          
+          // Add seller info to all products
+          userProducts.forEach(product => {
+            product.seller = sellerInfo
+          })
+        }
         
         setProducts(userProducts)
       } catch (error) {
@@ -83,78 +127,6 @@ export function UserProducts({ userId }: UserProductsProps) {
         <ProductCard key={product.id} product={product} />
       ))}
     </div>
-  )
-}
-
-function ProductCard({ product }: { product: Product }) {
-  const [isHovered, setIsHovered] = useState(false)
-  const [isFavorite, setIsFavorite] = useState(false)
-
-  return (
-    <Link
-      href={`/product/${product.id}`}
-      className="group relative overflow-hidden rounded-xl bg-zinc-900/50 backdrop-blur-sm transition-all hover:shadow-lg hover:shadow-violet-500/10"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div className="relative aspect-square overflow-hidden">
-        <Image
-          src={product.image || "/placeholder.svg"}
-          alt={product.title}
-          fill
-          className="object-cover transition-transform duration-500 group-hover:scale-110"
-        />
-        <div
-          className={`absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent transition-opacity ${isHovered ? "opacity-100" : "opacity-0"}`}
-        />
-
-        <button
-          className={`absolute right-3 top-3 rounded-full bg-black/30 p-2 backdrop-blur-md transition-all ${isFavorite ? "text-red-500" : "text-white"} ${isHovered ? "opacity-100" : "opacity-0"}`}
-          onClick={(e) => {
-            e.preventDefault()
-            setIsFavorite(!isFavorite)
-          }}
-        >
-          <Heart className={`h-5 w-5 ${isFavorite ? "fill-red-500" : ""}`} />
-        </button>
-
-        <div
-          className={`absolute bottom-0 left-0 right-0 p-4 transition-transform duration-300 ${isHovered ? "translate-y-0" : "translate-y-full"}`}
-        >
-          <div className="flex gap-2">
-            {product.bid ? (
-              <Button className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700">
-                Place Bid
-              </Button>
-            ) : (
-              <Button className="flex-1 bg-gradient-to-r from-blue-500 to-violet-500 text-white hover:from-blue-600 hover:to-violet-600">
-                Buy Now
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              className="border-zinc-700 bg-black/50 text-white backdrop-blur-md hover:bg-black/70"
-            >
-              View
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-4">
-        <h3 className="mb-1 text-lg font-semibold">{product.title}</h3>
-        <div className="mb-3 inline-block rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
-          {product.type}
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-lg font-bold">${product.price.toFixed(2)}</div>
-            {product.bid && <div className="text-sm text-green-400">Current bid: ${product.bid.toFixed(2)}</div>}
-          </div>
-        </div>
-      </div>
-    </Link>
   )
 }
 

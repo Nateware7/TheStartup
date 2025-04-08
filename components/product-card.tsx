@@ -80,18 +80,23 @@ export function ProductCard({ product }: { product: Product }) {
         {/* Header - Seller info */}
         <div className="p-4 border-b border-zinc-800/30">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <Link href={product.seller?.id ? `/profile/${product.seller.id}` : '#'} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <Avatar className="h-7 w-7 border border-zinc-800">
                 <AvatarImage src={product.seller?.avatar} alt={product.seller?.name} />
                 <AvatarFallback className="bg-gradient-to-br from-violet-600/80 to-indigo-600/80 text-xs text-white">
                   {getInitials(product.seller?.name || "")}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex items-center gap-1">
-                <span className="text-xs font-medium text-zinc-300">{product.seller?.name}</span>
-                {product.seller?.verified && <CheckCircle className="h-3 w-3 fill-indigo-500 text-white" />}
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-medium text-zinc-300">{product.seller?.name || "Anonymous"}</span>
+                  {product.seller?.verified && <CheckCircle className="h-3 w-3 fill-indigo-500 text-white" />}
+                </div>
+                {product.seller?.handle && (
+                  <span className="text-[10px] text-zinc-500">{product.seller.handle}</span>
+                )}
               </div>
-            </div>
+            </Link>
             <div className="rounded-full bg-zinc-800/50 px-2 py-0.5 text-[10px] font-medium text-zinc-400">
               {product.category}
             </div>
