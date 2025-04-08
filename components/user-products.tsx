@@ -1,48 +1,82 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Heart } from "lucide-react"
-
+import { Heart, Loader } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { db } from "@/lib/firebaseConfig"
+import { collection, query, where, getDocs } from "firebase/firestore"
 
-const products = [
-  {
-    id: "1",
-    title: "Neon Dreams Collection",
-    type: "Art",
-    price: 89.99,
-    bid: 95.0,
-    image: "/placeholder.svg?height=600&width=600",
-  },
-  {
-    id: "2",
-    title: "Cyberpunk Icon Set",
-    type: "Art",
-    price: 29.99,
-    bid: null,
-    image: "/placeholder.svg?height=600&width=600",
-  },
-  {
-    id: "3",
-    title: "Retro Wave Collection",
-    type: "Art",
-    price: 49.99,
-    bid: null,
-    image: "/placeholder.svg?height=600&width=600",
-  },
-  {
-    id: "4",
-    title: "Futuristic UI Elements",
-    type: "Templates",
-    price: 59.99,
-    bid: 65.0,
-    image: "/placeholder.svg?height=600&width=600",
-  },
-]
+// Define product type
+type Product = {
+  id: string
+  title: string
+  type: string
+  price: number
+  bid: number | null
+  image: string
+}
 
-export function UserProducts() {
+interface UserProductsProps {
+  userId: string
+}
+
+export function UserProducts({ userId }: UserProductsProps) {
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchUserProducts() {
+      try {
+        setLoading(true)
+        
+        // Query firestore for products where seller/creator is the userId
+        const q = query(collection(db, "listings"), where("sellerId", "==", userId))
+        const querySnapshot = await getDocs(q)
+        
+        const userProducts: Product[] = []
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          userProducts.push({
+            id: doc.id,
+            title: data.title || "Untitled Product",
+            type: data.category || "Other",
+            price: data.price || 0,
+            bid: data.currentBid || null,
+            image: data.image || "/placeholder.svg?height=600&width=600"
+          })
+        })
+        
+        setProducts(userProducts)
+      } catch (error) {
+        console.error("Error fetching user products:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchUserProducts()
+  }, [userId])
+  
+  if (loading) {
+    return (
+      <div className="flex h-40 w-full items-center justify-center">
+        <Loader className="h-8 w-8 animate-spin text-zinc-400" />
+      </div>
+    )
+  }
+  
+  if (products.length === 0) {
+    return (
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center backdrop-blur-sm">
+        <h3 className="text-lg font-medium">No Products Yet</h3>
+        <p className="mt-2 text-zinc-400">This user hasn't listed any products yet.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
       {products.map((product) => (
@@ -52,7 +86,7 @@ export function UserProducts() {
   )
 }
 
-function ProductCard({ product }) {
+function ProductCard({ product }: { product: Product }) {
   const [isHovered, setIsHovered] = useState(false)
   const [isFavorite, setIsFavorite] = useState(false)
 

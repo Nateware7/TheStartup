@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, User, Star, LogOut } from "lucide-react"
+import { Menu, X, User, Star, LogOut, UserCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -110,7 +110,26 @@ export function Navbar() {
             </nav>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-2">
+            {/* User Profile Link - only shown when logged in */}
+            {!isLoading && user && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link
+                      href={`/profile/${user.uid}`}
+                      className="rounded-full p-2 text-zinc-400 transition-colors hover:bg-zinc-800/50 hover:text-violet-400 group md:block"
+                    >
+                      <UserCircle className="h-6 w-6 transition-all duration-200 group-hover:text-violet-400" />
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>My Profile</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -150,7 +169,7 @@ export function Navbar() {
                   </Tooltip>
                 </TooltipProvider>
               </>
-            ) : (
+            ) :
               <>
                 <Link href="/auth/signin" className="hidden md:block">
                   <Button
@@ -179,7 +198,7 @@ export function Navbar() {
                   </Link>
                 )}
               </>
-            )}
+            }
 
             <button
               className="rounded-md p-2 text-zinc-400 md:hidden"
@@ -207,6 +226,21 @@ export function Navbar() {
                   </Link>
                 </li>
               ))}
+
+              {/* Profile link for mobile */}
+              {user && (
+                <li>
+                  <Link
+                    href={`/profile/${user.uid}`}
+                    className="flex items-center text-xl font-medium text-white"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <UserCircle className="mr-2 h-5 w-5" />
+                    My Profile
+                  </Link>
+                </li>
+              )}
+
               <li>
                 <Link
                   href="/favorites"
@@ -217,6 +251,7 @@ export function Navbar() {
                   Favorites
                 </Link>
               </li>
+              
               {isLoading ? (
                 <li className="pt-4">
                   <div className="h-10 w-full animate-pulse rounded-md bg-zinc-800/50"></div>
