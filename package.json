@@ -59,6 +59,7 @@
     "react-dom": "^19",
     "react-hook-form": "latest",
     "react-hot-toast": "^2.5.2",
+    "react-image-crop": "^11.0.7",
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.0",
     "sonner": "^1.7.1",

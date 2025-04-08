@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { ProfileSetupForm } from '@/components/profile-setup-form';
 import { AnimatedBackground } from '@/components/animated-background';
+import { Navbar } from '@/components/navbar';
 import { auth } from '@/lib/firebaseConfig';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -32,13 +33,21 @@ export default function ProfileSetupPage() {
 
   return (
     <AnimatedBackground>
-      <div className="min-h-screen text-white flex flex-col items-center justify-center">
-        <div className="w-full max-w-md px-6 py-8 bg-black/20 backdrop-blur-lg rounded-xl shadow-xl">
-          <h1 className="text-2xl font-bold mb-6 text-center">Complete Your Profile</h1>
-          <p className="text-zinc-400 mb-6 text-center">
-            Share a bit about yourself to help others connect with you.
-          </p>
-          <ProfileSetupForm />
+      <div className="min-h-screen text-white">
+        <Navbar />
+        
+        <div className="container mx-auto px-4 pt-20 pb-16">
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-zinc-900/80 backdrop-blur-md rounded-xl border border-zinc-800/60 shadow-xl overflow-hidden">
+              <div className="p-6">
+                <h1 className="text-2xl font-bold mb-2 text-center">Complete Your Profile</h1>
+                <p className="text-zinc-400 mb-8 text-center">
+                  Share a bit about yourself to help others connect with you.
+                </p>
+                <ProfileSetupForm />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </AnimatedBackground>

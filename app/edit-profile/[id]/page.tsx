@@ -17,6 +17,7 @@ import { Navbar } from '@/components/navbar'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Loader, User, ImageIcon } from 'lucide-react'
 import Link from 'next/link'
+import { ImageCropper } from '@/components/image-cropper'
 
 // Initialize Cloudinary
 const cld = new Cloudinary({
@@ -53,6 +54,14 @@ function EditProfileContent({ userId }: { userId: string }) {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [bannerPreview, setBannerPreview] = useState<string | null>(null)
   const [profilePreview, setProfilePreview] = useState<string | null>(null)
+  
+  // State for image croppers
+  const [profileCropperOpen, setProfileCropperOpen] = useState(false)
+  const [bannerCropperOpen, setBannerCropperOpen] = useState(false)
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null)
+  const [bannerImageFile, setBannerImageFile] = useState<File | null>(null)
+  const [croppedProfileBlob, setCroppedProfileBlob] = useState<Blob | null>(null)
+  const [croppedBannerBlob, setCroppedBannerBlob] = useState<Blob | null>(null)
   
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -115,39 +124,44 @@ function EditProfileContent({ userId }: { userId: string }) {
     checkAuth()
   }, [userId, router, setValue])
   
-  // Create file previews when files are selected
-  useEffect(() => {
-    if (watchBanner && watchBanner[0]) {
-      const file = watchBanner[0]
-      const reader = new FileReader()
-      
-      reader.onload = (e) => {
-        if (e.target) {
-          setBannerPreview(e.target.result as string)
-        }
-      }
-      
-      reader.readAsDataURL(file)
+  // Handle profile picture file selection
+  const handleProfileImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0]
+      setProfileImageFile(file)
+      setProfileCropperOpen(true)
     }
-    
-    if (watchProfilePicture && watchProfilePicture[0]) {
-      const file = watchProfilePicture[0]
-      const reader = new FileReader()
-      
-      reader.onload = (e) => {
-        if (e.target) {
-          setProfilePreview(e.target.result as string)
-        }
-      }
-      
-      reader.readAsDataURL(file)
-    }
-  }, [watchBanner, watchProfilePicture])
+  }
 
-  const uploadToCloudinary = async (file: File, folder: string) => {
-    if (!file) return null
+  // Handle banner image file selection
+  const handleBannerImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0]
+      setBannerImageFile(file)
+      setBannerCropperOpen(true)
+    }
+  }
+  
+  // Handle profile crop completion
+  const handleProfileCropComplete = (blob: Blob) => {
+    setCroppedProfileBlob(blob)
+    const previewUrl = URL.createObjectURL(blob)
+    setProfilePreview(previewUrl)
+  }
+  
+  // Handle banner crop completion
+  const handleBannerCropComplete = (blob: Blob) => {
+    setCroppedBannerBlob(blob)
+    const previewUrl = URL.createObjectURL(blob)
+    setBannerPreview(previewUrl)
+  }
+
+  const uploadToCloudinary = async (blob: Blob | null, folder: string) => {
+    if (!blob) return null
 
     const formData = new FormData()
+    // Create a file from the blob
+    const file = new File([blob], 'cropped-image.jpg', { type: 'image/jpeg' })
     formData.append('file', file)
     formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'profilesetup')
     formData.append('folder', folder)
@@ -187,14 +201,14 @@ function EditProfileContent({ userId }: { userId: string }) {
         updatedAt: new Date(),
       }
 
-      // Upload images if provided
-      if (data.banner && data.banner[0]) {
-        const bannerUrl = await uploadToCloudinary(data.banner[0], `users/${user.uid}/banners`)
+      // Upload cropped images if provided
+      if (croppedBannerBlob) {
+        const bannerUrl = await uploadToCloudinary(croppedBannerBlob, `users/${user.uid}/banners`)
         if (bannerUrl) updateData.banner = bannerUrl
       }
 
-      if (data.profilePicture && data.profilePicture[0]) {
-        const profileUrl = await uploadToCloudinary(data.profilePicture[0], `users/${user.uid}/profiles`)
+      if (croppedProfileBlob) {
+        const profileUrl = await uploadToCloudinary(croppedProfileBlob, `users/${user.uid}/profiles`)
         if (profileUrl) updateData.profilePicture = profileUrl
       }
 
@@ -286,11 +300,19 @@ function EditProfileContent({ userId }: { userId: string }) {
                         id="banner"
                         type="file"
                         accept="image/*"
-                        {...register("banner")}
-                        className="w-full p-2 rounded-md bg-zinc-800/50 border border-zinc-700 text-zinc-300"
+                        className="hidden"
+                        onChange={handleBannerImageSelect}
                       />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => document.getElementById('banner')?.click()}
+                        className="w-full border-zinc-700 text-white hover:bg-zinc-800"
+                      >
+                        {bannerPreview ? 'Change Banner Image' : 'Upload Banner Image'}
+                      </Button>
                       <p className="mt-1 text-xs text-zinc-400">
-                        Recommended size: 1200 × 300 pixels. Leave empty to keep your current banner.
+                        Recommended size: 1200 × 300 pixels. The banner will be cropped to 4:1 aspect ratio.
                       </p>
                     </div>
                   </div>
@@ -312,18 +334,26 @@ function EditProfileContent({ userId }: { userId: string }) {
                         </div>
                       )}
                     </div>
-                    <div>
+                    <div className="flex justify-center">
                       <input
                         id="profilePicture"
                         type="file"
                         accept="image/*"
-                        {...register("profilePicture")}
-                        className="w-full p-2 rounded-md bg-zinc-800/50 border border-zinc-700 text-zinc-300"
+                        className="hidden"
+                        onChange={handleProfileImageSelect}
                       />
-                      <p className="mt-1 text-xs text-zinc-400">
-                        Square image recommended (e.g., 400 × 400 pixels). Leave empty to keep your current picture.
-                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => document.getElementById('profilePicture')?.click()}
+                        className="border-zinc-700 text-white hover:bg-zinc-800"
+                      >
+                        {profilePreview ? 'Change Profile Picture' : 'Upload Profile Picture'}
+                      </Button>
                     </div>
+                    <p className="text-center text-xs text-zinc-400">
+                      Square image recommended. Will be cropped to a circle.
+                    </p>
                   </div>
                   
                   {/* Username */}
@@ -397,6 +427,29 @@ function EditProfileContent({ userId }: { userId: string }) {
           </div>
         </div>
       </div>
+      
+      {/* Image Croppers */}
+      <ImageCropper
+        isOpen={profileCropperOpen}
+        onClose={() => setProfileCropperOpen(false)}
+        onCropComplete={handleProfileCropComplete}
+        imageFile={profileImageFile}
+        aspectRatio={1}
+        cropShape="round"
+        minWidth={150}
+        title="Crop Profile Picture"
+      />
+      
+      <ImageCropper
+        isOpen={bannerCropperOpen}
+        onClose={() => setBannerCropperOpen(false)}
+        onCropComplete={handleBannerCropComplete}
+        imageFile={bannerImageFile}
+        aspectRatio={4}
+        cropShape="rect"
+        minWidth={400}
+        title="Crop Banner Image"
+      />
     </AnimatedBackground>
   )
 } 
