@@ -10,11 +10,13 @@ import {
   MessageSquare, 
   ChevronLeft,
   PlusCircle,
-  X 
+  X,
+  Info
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { auth, db } from "@/lib/firebaseConfig"
 import { 
   collection, 
@@ -24,13 +26,13 @@ import {
   getDocs, 
   getDoc, 
   doc, 
+  setDoc,
   addDoc, 
   serverTimestamp, 
   onSnapshot,
-  updateDoc,
   Timestamp,
-  setDoc,
-  limit
+  limit,
+  collectionGroup
 } from "firebase/firestore"
 import toast from "react-hot-toast"
 
@@ -43,20 +45,17 @@ interface UserInfo {
 
 interface Conversation {
   id: string
-  participantIds: string[]
-  participants: UserInfo[]
+  userIds: string[]
+  otherUser: UserInfo | null
   lastMessage: string
-  lastMessageTime: Timestamp | null
-  unreadCount: number
+  updatedAt: Timestamp | null
 }
 
 interface Message {
   id: string
-  conversationId: string
   senderId: string
-  text: string
-  timestamp: Timestamp | null
-  read: boolean
+  message: string
+  createdAt: Timestamp | null
 }
 
 export function MessageCenter() {
@@ -70,16 +69,57 @@ export function MessageCenter() {
   const [currentUser, setCurrentUser] = useState<UserInfo | null>(null)
   const [mobileViewMode, setMobileViewMode] = useState<'list' | 'chat'>('list')
   const messageEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false)
   const [userSearchQuery, setUserSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<UserInfo[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [atBottom, setAtBottom] = useState(true)
   
-  // Scroll to bottom of messages when new messages arrive
+  // Check if user is at bottom of chat
+  const checkIfAtBottom = () => {
+    if (!messagesContainerRef.current) return
+
+    // The scrollable container is now the parent element
+    const scrollableParent = messagesContainerRef.current.parentElement
+    if (!scrollableParent) return
+
+    const { scrollTop, scrollHeight, clientHeight } = scrollableParent
+    const isAtBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 50
+    setAtBottom(isAtBottom)
+  }
+  
+  // Scroll to bottom of messages
   useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+    if (atBottom && messageEndRef.current && messagesContainerRef.current) {
+      // Use scrollTo instead of scrollIntoView to avoid whole page scrolling
+      const container = messagesContainerRef.current
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth"
+      })
+    }
+  }, [messages, atBottom])
+
+  // Scroll to bottom whenever new messages arrive
+  useEffect(() => {
+    if (messages.length > 0 && messagesContainerRef.current) {
+      // If user was already at bottom or this is a new message being sent
+      if (atBottom) {
+        const container = messagesContainerRef.current
+        setTimeout(() => {
+          if (container) {
+            // Find the actual scrollable parent which is now the container div
+            const scrollableParent = container.parentElement
+            if (scrollableParent) {
+              scrollableParent.scrollTop = scrollableParent.scrollHeight
+            }
+          }
+        }, 50)
+      }
+    }
+  }, [messages.length, atBottom])
 
   // Check if user is authenticated
   useEffect(() => {
@@ -100,9 +140,6 @@ export function MessageCenter() {
             username: userData.username || "Anonymous",
             profilePicture: userData.profilePicture || "/placeholder.svg?height=200&width=200",
           })
-          
-          // Initialize collections if needed
-          await initializeCollections()
           
           // Fetch user conversations
           fetchConversations(user.uid)
@@ -132,31 +169,30 @@ export function MessageCenter() {
             const conversationData = conversationDoc.data();
             
             // Make sure the current user is part of this conversation
-            if (conversationData.participantIds.includes(currentUser.id)) {
-              // Get participant details
-              const participantsInfo: UserInfo[] = [];
-              for (const participantId of conversationData.participantIds) {
-                if (participantId !== currentUser.id) {
-                  const userDoc = await getDoc(doc(db, "users", participantId));
-                  if (userDoc.exists()) {
-                    const userData = userDoc.data();
-                    participantsInfo.push({
-                      id: participantId,
-                      username: userData.username || "Anonymous",
-                      profilePicture: userData.profilePicture || "/placeholder.svg?height=200&width=200",
-                    });
-                  }
+            if (conversationData.userIds.includes(currentUser.id)) {
+              // Get other user details
+              const otherUserId = conversationData.userIds.find((id: string) => id !== currentUser.id);
+              let otherUser: UserInfo | null = null;
+              
+              if (otherUserId) {
+                const userDoc = await getDoc(doc(db, "users", otherUserId));
+                if (userDoc.exists()) {
+                  const userData = userDoc.data();
+                  otherUser = {
+                    id: otherUserId,
+                    username: userData.username || "Anonymous",
+                    profilePicture: userData.profilePicture || "/placeholder.svg?height=200&width=200",
+                  };
                 }
               }
               
               // Set active conversation
               const conversation: Conversation = {
                 id: conversationDoc.id,
-                participantIds: conversationData.participantIds,
-                participants: participantsInfo,
+                userIds: conversationData.userIds,
+                otherUser,
                 lastMessage: conversationData.lastMessage || "No messages yet",
-                lastMessageTime: conversationData.lastMessageTime,
-                unreadCount: conversationData.unreadCount?.[currentUser.id] || 0
+                updatedAt: conversationData.updatedAt,
               };
               
               handleSelectConversation(conversation);
@@ -182,46 +218,41 @@ export function MessageCenter() {
       const conversationsRef = collection(db, "conversations")
       const conversationsQuery = query(
         conversationsRef,
-        where("participantIds", "array-contains", userId),
-        orderBy("lastMessageTime", "desc")
+        where("userIds", "array-contains", userId),
+        orderBy("updatedAt", "desc")
       )
       
       // Set up real-time listener for conversations
       const unsubscribe = onSnapshot(conversationsQuery, async (querySnapshot) => {
-        const conversationsData: Conversation[] = []
-        
-        // Process each conversation
-        for (const conversationDoc of querySnapshot.docs) {
+        const conversationsPromises = querySnapshot.docs.map(async (conversationDoc) => {
           const conversationData = conversationDoc.data()
           
-          // Get participant details
-          const participantsInfo: UserInfo[] = []
-          if (conversationData.participantIds && Array.isArray(conversationData.participantIds)) {
-            for (const participantId of conversationData.participantIds) {
-              if (participantId !== userId) {
-                const userDoc = await getDoc(doc(db, "users", participantId))
-                if (userDoc.exists()) {
-                  const userData = userDoc.data()
-                  participantsInfo.push({
-                    id: participantId,
-                    username: userData.username as string || "Anonymous",
-                    profilePicture: userData.profilePicture as string || "/placeholder.svg?height=200&width=200",
-                  })
-                }
+          // Get other user details
+          const otherUserId = conversationData.userIds.find((id: string) => id !== userId)
+          let otherUser: UserInfo | null = null
+          
+          if (otherUserId) {
+            const userDoc = await getDoc(doc(db, "users", otherUserId))
+            if (userDoc.exists()) {
+              const userData = userDoc.data()
+              otherUser = {
+                id: otherUserId,
+                username: userData.username || "Anonymous",
+                profilePicture: userData.profilePicture || "/placeholder.svg?height=200&width=200",
               }
             }
           }
           
-          conversationsData.push({
+          return {
             id: conversationDoc.id,
-            participantIds: conversationData.participantIds || [],
-            participants: participantsInfo,
+            userIds: conversationData.userIds || [],
+            otherUser,
             lastMessage: conversationData.lastMessage || "No messages yet",
-            lastMessageTime: conversationData.lastMessageTime,
-            unreadCount: conversationData.unreadCount?.[userId] || 0
-          })
-        }
+            updatedAt: conversationData.updatedAt,
+          }
+        })
         
+        const conversationsData = await Promise.all(conversationsPromises)
         setConversations(conversationsData)
         setIsLoading(false)
       }, (error) => {
@@ -242,12 +273,11 @@ export function MessageCenter() {
   // Function to load messages for a conversation
   const loadMessages = async (conversationId: string) => {
     try {
-      // Query messages for the selected conversation
-      const messagesRef = collection(db, "messages")
+      // Get nested messages collection for this conversation
+      const messagesRef = collection(db, `conversations/${conversationId}/messages`)
       const messagesQuery = query(
         messagesRef,
-        where("conversationId", "==", conversationId),
-        orderBy("timestamp", "asc")
+        orderBy("createdAt", "asc")
       )
       
       // Set up real-time listener for messages
@@ -258,11 +288,9 @@ export function MessageCenter() {
           const messageData = doc.data()
           messagesData.push({
             id: doc.id,
-            conversationId: messageData.conversationId as string,
             senderId: messageData.senderId as string,
-            text: messageData.text as string || "",
-            timestamp: messageData.timestamp as Timestamp | null,
-            read: messageData.read as boolean || false
+            message: messageData.message as string || "",
+            createdAt: messageData.createdAt as Timestamp | null,
           })
         })
         
@@ -284,12 +312,10 @@ export function MessageCenter() {
   const handleSelectConversation = async (conversation: Conversation) => {
     setActiveConversation(conversation)
     setMobileViewMode('chat')
+    setAtBottom(true)
     
     // Load messages for this conversation
     const unsubscribe = await loadMessages(conversation.id)
-    
-    // Mark messages as read
-    // You would add code here to update the unread count
     
     return () => unsubscribe()
   }
@@ -299,83 +325,43 @@ export function MessageCenter() {
     if (!newMessage.trim() || !activeConversation || !currentUser) return
     
     try {
-      // Add message to the messages collection
-      await addDoc(collection(db, "messages"), {
-        conversationId: activeConversation.id,
+      // Add message to the nested messages collection
+      const messageRef = collection(db, `conversations/${activeConversation.id}/messages`)
+      await addDoc(messageRef, {
         senderId: currentUser.id,
-        text: newMessage,
-        timestamp: serverTimestamp(),
-        read: false
+        message: newMessage,
+        createdAt: serverTimestamp(),
       })
       
       // Update the conversation with the last message
-      await updateDoc(doc(db, "conversations", activeConversation.id), {
+      await setDoc(doc(db, "conversations", activeConversation.id), {
+        userIds: activeConversation.userIds,
         lastMessage: newMessage,
-        lastMessageTime: serverTimestamp()
-      })
+        updatedAt: serverTimestamp()
+      }, { merge: true })
       
       // Clear the input field
       setNewMessage("")
+
+      // Ensure we're at the bottom after sending
+      setAtBottom(true)
+      
+      // Force scroll to bottom immediately
+      if (messagesContainerRef.current) {
+        setTimeout(() => {
+          const scrollableParent = messagesContainerRef.current?.parentElement
+          if (scrollableParent) {
+            scrollableParent.scrollTop = scrollableParent.scrollHeight
+          }
+        }, 100)
+      }
     } catch (error) {
       console.error("Error sending message:", error)
       toast.error("Failed to send message")
     }
   }
   
-  // Function to initialize collections if needed
-  const initializeCollections = async () => {
-    if (!currentUser) return;
-    
-    try {
-      // Check if conversations collection exists by trying to get a document
-      const conversationsRef = collection(db, "conversations");
-      
-      // Create a test document in conversations collection
-      // This will create the collection if it doesn't exist
-      const testConversationRef = doc(conversationsRef, "test_init_doc");
-      
-      try {
-        // Try to get the document
-        const testDoc = await getDoc(testConversationRef);
-        
-        // If it doesn't exist, create it
-        if (!testDoc.exists()) {
-          await setDoc(testConversationRef, {
-            _isTestDoc: true,
-            _createdAt: serverTimestamp(),
-            participantIds: [currentUser.id],  // Include current user to match security rules
-          });
-          console.log("Created test document to initialize conversations collection");
-        }
-      } catch (error) {
-        console.error("Error checking/creating test conversation document:", error);
-      }
-      
-      // Similarly for messages collection
-      const messagesRef = collection(db, "messages");
-      const testMessageRef = doc(messagesRef, "test_init_doc");
-      
-      try {
-        const testMessageDoc = await getDoc(testMessageRef);
-        
-        if (!testMessageDoc.exists()) {
-          await setDoc(testMessageRef, {
-            _isTestDoc: true,
-            _createdAt: serverTimestamp(),
-            senderId: currentUser.id,  // Include current user to match security rules
-            conversationId: "test_init_doc"
-          });
-          console.log("Created test document to initialize messages collection");
-        }
-      } catch (error) {
-        console.error("Error checking/creating test message document:", error);
-      }
-    } catch (error) {
-      console.error("Error initializing collections:", error);
-    }
-  };
-  
-  // Add new function to search for users
+  // Function to search for users
   const searchUsers = async (queryText: string) => {
     if (!queryText.trim() || queryText.length < 2) {
       setSearchResults([]);
@@ -392,6 +378,9 @@ export function MessageCenter() {
       
       const results: UserInfo[] = [];
       querySnapshot.forEach((doc) => {
+        // Skip the current user
+        if (doc.id === currentUser?.id) return;
+        
         const userData = doc.data();
         // Filter client-side since Firestore doesn't support contains
         const username = userData.username as string | undefined;
@@ -417,92 +406,63 @@ export function MessageCenter() {
     }
   };
 
-  // Add new function to start a conversation with a user
+  // Function to generate a consistent conversation ID for two users
+  const generateConversationId = (uid1: string, uid2: string): string => {
+    return [uid1, uid2].sort().join('_');
+  };
+
+  // Function to start a conversation with a user
   const startConversation = async (recipientId: string, recipientName: string) => {
     if (!currentUser) return;
     
     try {
-      // First check if a conversation already exists between these users
-      const conversationsRef = collection(db, "conversations");
-      const conversationsQuery = query(
-        conversationsRef,
-        where("participantIds", "array-contains", currentUser.id)
-      );
+      // Generate consistent conversation ID
+      const conversationId = generateConversationId(currentUser.id, recipientId);
       
-      const querySnapshot = await getDocs(conversationsQuery);
-      let existingConversationId = null;
+      // Check if conversation exists
+      const conversationRef = doc(db, "conversations", conversationId);
+      const conversationSnap = await getDoc(conversationRef);
       
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.participantIds && 
-            Array.isArray(data.participantIds) && 
-            data.participantIds.includes(recipientId)) {
-          existingConversationId = doc.id;
-        }
-      });
+      let conversation: Conversation;
       
-      // If conversation already exists, just open it
-      if (existingConversationId) {
-        const conversationDoc = await getDoc(doc(db, "conversations", existingConversationId));
-        if (conversationDoc.exists()) {
-          const conversationData = conversationDoc.data();
-          
-          // Get participant details
-          const participantsInfo: UserInfo[] = [];
-          for (const participantId of conversationData.participantIds) {
-            if (participantId !== currentUser.id) {
-              const userDoc = await getDoc(doc(db, "users", participantId));
-              if (userDoc.exists()) {
-                const userData = userDoc.data();
-                participantsInfo.push({
-                  id: participantId,
-                  username: userData.username || "Anonymous",
-                  profilePicture: userData.profilePicture || "/placeholder.svg?height=200&width=200",
-                });
-              }
-            }
-          }
-          
-          const conversation: Conversation = {
-            id: existingConversationId,
-            participantIds: conversationData.participantIds,
-            participants: participantsInfo,
-            lastMessage: conversationData.lastMessage || "No messages yet",
-            lastMessageTime: conversationData.lastMessageTime,
-            unreadCount: conversationData.unreadCount?.[currentUser.id] || 0
-          };
-          
-          handleSelectConversation(conversation);
-        }
-      } else {
-        // Create a new conversation
-        const newConversation = await addDoc(conversationsRef, {
-          participantIds: [currentUser.id, recipientId],
-          lastMessageTime: serverTimestamp(),
-          lastMessage: "No messages yet",
-          createdAt: serverTimestamp(),
-          unreadCount: {
-            [currentUser.id]: 0,
-            [recipientId]: 0
-          }
-        });
+      if (conversationSnap.exists()) {
+        // Conversation exists, get data
+        const conversationData = conversationSnap.data();
         
-        // Get conversation with participant info
-        const newConversationObj: Conversation = {
-          id: newConversation.id,
-          participantIds: [currentUser.id, recipientId],
-          participants: [{
+        conversation = {
+          id: conversationId,
+          userIds: conversationData.userIds,
+          otherUser: {
             id: recipientId,
             username: recipientName,
-            profilePicture: "/placeholder.svg?height=200&width=200",  // We can update this later
-          }],
-          lastMessage: "No messages yet",
-          lastMessageTime: null,
-          unreadCount: 0
+            profilePicture: "/placeholder.svg?height=200&width=200",
+          },
+          lastMessage: conversationData.lastMessage || "No messages yet",
+          updatedAt: conversationData.updatedAt,
         };
+      } else {
+        // Create a new conversation
+        await setDoc(conversationRef, {
+          userIds: [currentUser.id, recipientId],
+          lastMessage: "No messages yet",
+          updatedAt: serverTimestamp()
+        });
         
-        handleSelectConversation(newConversationObj);
+        conversation = {
+          id: conversationId,
+          userIds: [currentUser.id, recipientId],
+          otherUser: {
+            id: recipientId,
+            username: recipientName,
+            profilePicture: "/placeholder.svg?height=200&width=200",
+          },
+          lastMessage: "No messages yet",
+          updatedAt: null
+        };
       }
+      
+      // Open the conversation
+      handleSelectConversation(conversation);
       
       // Close the modal
       setIsSearchModalOpen(false);
@@ -514,13 +474,36 @@ export function MessageCenter() {
     }
   };
   
+  // Format timestamp to display
+  const formatTimestamp = (timestamp: Timestamp | null): string => {
+    if (!timestamp) return '';
+    
+    const date = timestamp.toDate();
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      // Today, show time
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    } else if (diffDays === 1) {
+      // Yesterday
+      return 'Yesterday';
+    } else if (diffDays < 7) {
+      // Within a week, show day name
+      return date.toLocaleDateString('en-US', { weekday: 'short' });
+    } else {
+      // More than a week, show date
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+  };
+  
   // Render the component
   return (
-    <div className="bg-zinc-900/80 backdrop-blur-md rounded-xl border border-zinc-800/60 overflow-hidden">
-      <div className="grid md:grid-cols-12 min-h-[600px]">
+    <div className="bg-zinc-900/80 backdrop-blur-md rounded-xl border border-zinc-800/60 overflow-hidden h-full">
+      <div className="grid md:grid-cols-12 h-full">
         {/* Conversations Sidebar */}
-        <div className={`md:col-span-4 border-r border-zinc-800 ${mobileViewMode === 'chat' ? 'hidden md:block' : 'block'}`}>
-          <div className="p-4 border-b border-zinc-800">
+        <div className={`md:col-span-4 border-r border-zinc-800 flex flex-col ${mobileViewMode === 'chat' ? 'hidden md:flex' : 'flex'}`}>
+          <div className="p-4 border-b border-zinc-800 flex-shrink-0">
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-400 h-4 w-4" />
@@ -543,7 +526,7 @@ export function MessageCenter() {
             </div>
           </div>
           
-          <div className="overflow-y-auto max-h-[535px]">
+          <ScrollArea className="flex-1">
             {isLoading ? (
               <div className="flex justify-center items-center h-40">
                 <Loader className="w-6 h-6 animate-spin" />
@@ -568,9 +551,7 @@ export function MessageCenter() {
             ) : (
               conversations
                 .filter(convo => 
-                  convo.participants.some(p => 
-                    p.username.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
+                  convo.otherUser?.username.toLowerCase().includes(searchQuery.toLowerCase())
                 )
                 .map(conversation => (
                   <div
@@ -582,43 +563,33 @@ export function MessageCenter() {
                   >
                     <Avatar className="h-12 w-12 border border-zinc-700">
                       <AvatarImage 
-                        src={conversation.participants[0]?.profilePicture} 
-                        alt={conversation.participants[0]?.username} 
+                        src={conversation.otherUser?.profilePicture} 
+                        alt={conversation.otherUser?.username} 
                       />
                       <AvatarFallback className="bg-zinc-700">
-                        {conversation.participants[0]?.username.charAt(0).toUpperCase() || "?"}
+                        {conversation.otherUser?.username.charAt(0).toUpperCase() || "?"}
                       </AvatarFallback>
                     </Avatar>
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center">
                         <h3 className="font-medium truncate">
-                          {conversation.participants[0]?.username || "Anonymous"}
+                          {conversation.otherUser?.username || "Anonymous"}
                         </h3>
                         <span className="text-xs text-zinc-400">
-                          {conversation.lastMessageTime ? 
-                            new Date(conversation.lastMessageTime.toDate()).toLocaleDateString('en-US', {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            }) : ''}
+                          {formatTimestamp(conversation.updatedAt)}
                         </span>
                       </div>
                       <p className="text-sm text-zinc-400 truncate">{conversation.lastMessage}</p>
                     </div>
-                    
-                    {conversation.unreadCount > 0 && (
-                      <div className="h-5 w-5 rounded-full bg-blue-500 flex items-center justify-center text-xs">
-                        {conversation.unreadCount}
-                      </div>
-                    )}
                   </div>
                 ))
             )}
-          </div>
+          </ScrollArea>
         </div>
         
         {/* Messages Area */}
-        <div className={`md:col-span-8 flex flex-col ${mobileViewMode === 'list' ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`md:col-span-8 h-full flex flex-col ${mobileViewMode === 'list' ? 'hidden md:flex' : 'flex'}`}>
           {!activeConversation ? (
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-zinc-400">
               <MessageSquare className="h-16 w-16 mb-4 opacity-20" />
@@ -628,9 +599,9 @@ export function MessageCenter() {
               </p>
             </div>
           ) : (
-            <>
+            <div className="flex flex-col h-full relative">
               {/* Chat Header */}
-              <div className="p-4 border-b border-zinc-800 flex items-center">
+              <div className="p-4 border-b border-zinc-800 flex items-center flex-shrink-0">
                 <button 
                   className="md:hidden mr-2 p-1"
                   onClick={() => setMobileViewMode('list')}
@@ -640,80 +611,96 @@ export function MessageCenter() {
                 
                 <Avatar className="h-10 w-10 border border-zinc-700">
                   <AvatarImage 
-                    src={activeConversation.participants[0]?.profilePicture} 
-                    alt={activeConversation.participants[0]?.username} 
+                    src={activeConversation.otherUser?.profilePicture} 
+                    alt={activeConversation.otherUser?.username} 
                   />
                   <AvatarFallback className="bg-zinc-700">
-                    {activeConversation.participants[0]?.username.charAt(0).toUpperCase() || "?"}
+                    {activeConversation.otherUser?.username.charAt(0).toUpperCase() || "?"}
                   </AvatarFallback>
                 </Avatar>
                 
-                <div className="ml-3">
+                <div className="ml-3 flex-1">
                   <h3 className="font-medium">
-                    {activeConversation.participants[0]?.username || "Anonymous"}
+                    {activeConversation.otherUser?.username || "Anonymous"}
                   </h3>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-zinc-400 hover:text-white"
+                  title="Conversation Info"
+                >
+                  <Info className="h-5 w-5" />
+                </Button>
+              </div>
+              
+              {/* Message Container - Positioned absolutely between header and input */}
+              <div className="absolute top-[72px] bottom-[72px] left-0 right-0 overflow-y-auto overflow-x-hidden">
+                {/* Messages List */}
+                <div 
+                  className="p-4 space-y-6 scroll-pt-4 relative min-h-full" 
+                  ref={messagesContainerRef}
+                  onScroll={checkIfAtBottom}
+                >
+                  {messages.length === 0 ? (
+                    <div className="h-full flex items-center justify-center text-zinc-400">
+                      <p>No messages yet. Send a message to start the conversation!</p>
+                    </div>
+                  ) : (
+                    messages.map((message) => {
+                      const isCurrentUser = currentUser?.id === message.senderId
+                      return (
+                        <div 
+                          key={message.id}
+                          className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} w-full`}
+                        >
+                          {!isCurrentUser && (
+                            <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0 border border-zinc-700">
+                              <AvatarImage 
+                                src={activeConversation?.otherUser?.profilePicture} 
+                                alt={activeConversation?.otherUser?.username} 
+                              />
+                              <AvatarFallback className="bg-zinc-700 text-xs">
+                                {activeConversation?.otherUser?.username.charAt(0).toUpperCase() || "?"}
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+                          <div className={`max-w-[70%] rounded-lg py-2 px-4 ${
+                            isCurrentUser 
+                              ? 'bg-blue-600 text-white rounded-br-none' 
+                              : 'bg-zinc-800 text-zinc-100 rounded-bl-none'
+                          }`}>
+                            <p className="break-words whitespace-normal overflow-hidden">{message.message}</p>
+                            <div className={`text-xs mt-1 ${isCurrentUser ? 'text-blue-200' : 'text-zinc-400'}`}>
+                              {message.createdAt ? 
+                                new Date(message.createdAt.toDate()).toLocaleTimeString('en-US', {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                }) : ''}
+                            </div>
+                          </div>
+                          {isCurrentUser && (
+                            <Avatar className="h-8 w-8 ml-2 mt-1 flex-shrink-0 border border-zinc-700">
+                              <AvatarImage 
+                                src={currentUser?.profilePicture} 
+                                alt={currentUser?.username} 
+                              />
+                              <AvatarFallback className="bg-zinc-700 text-xs">
+                                {currentUser?.username.charAt(0).toUpperCase() || "?"}
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+                        </div>
+                      )
+                    })
+                  )}
+                  <div ref={messageEndRef} className="h-px w-full absolute bottom-0" />
                 </div>
               </div>
               
-              {/* Messages List */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                {messages.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-zinc-400">
-                    <p>No messages yet. Send a message to start the conversation!</p>
-                  </div>
-                ) : (
-                  messages.map((message) => {
-                    const isCurrentUser = currentUser?.id === message.senderId
-                    return (
-                      <div 
-                        key={message.id}
-                        className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} w-full`}
-                      >
-                        {!isCurrentUser && (
-                          <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0 border border-zinc-700">
-                            <AvatarImage 
-                              src={activeConversation?.participants[0]?.profilePicture} 
-                              alt={activeConversation?.participants[0]?.username} 
-                            />
-                            <AvatarFallback className="bg-zinc-700 text-xs">
-                              {activeConversation?.participants[0]?.username.charAt(0).toUpperCase() || "?"}
-                            </AvatarFallback>
-                          </Avatar>
-                        )}
-                        <div className={`max-w-[70%] rounded-lg py-2 px-4 ${
-                          isCurrentUser 
-                            ? 'bg-blue-600 text-white rounded-br-none' 
-                            : 'bg-zinc-800 text-zinc-100 rounded-bl-none'
-                        }`}>
-                          <p className="break-words">{message.text}</p>
-                          <div className={`text-xs mt-1 ${isCurrentUser ? 'text-blue-200' : 'text-zinc-400'}`}>
-                            {message.timestamp ? 
-                              new Date(message.timestamp.toDate()).toLocaleTimeString('en-US', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              }) : ''}
-                          </div>
-                        </div>
-                        {isCurrentUser && (
-                          <Avatar className="h-8 w-8 ml-2 mt-1 flex-shrink-0 border border-zinc-700">
-                            <AvatarImage 
-                              src={currentUser?.profilePicture} 
-                              alt={currentUser?.username} 
-                            />
-                            <AvatarFallback className="bg-zinc-700 text-xs">
-                              {currentUser?.username.charAt(0).toUpperCase() || "?"}
-                            </AvatarFallback>
-                          </Avatar>
-                        )}
-                      </div>
-                    )
-                  })
-                )}
-                <div ref={messageEndRef} />
-              </div>
-              
-              {/* Message Input */}
-              <div className="p-4 border-t border-zinc-800">
+              {/* Message Input - Fixed at bottom */}
+              <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-zinc-800 bg-zinc-900/80 z-10">
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <Input
@@ -740,7 +727,7 @@ export function MessageCenter() {
                   </div>
                 </div>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>

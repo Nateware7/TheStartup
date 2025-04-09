@@ -6,15 +6,10 @@ import { MessageCircle, Loader } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { auth, db } from '@/lib/firebaseConfig'
 import { 
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  getDocs, 
-  serverTimestamp,
+  doc, 
   getDoc,
-  doc,
-  setDoc
+  setDoc,
+  serverTimestamp
 } from 'firebase/firestore'
 import toast from 'react-hot-toast'
 
@@ -36,51 +31,10 @@ export function MessageButton({
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
 
-  // Function to initialize collections if they don't exist
-  const initializeCollections = async (userId: string) => {
-    try {
-      // Check if conversations collection exists
-      const conversationsRef = collection(db, 'conversations')
-      const testConversationRef = doc(conversationsRef, 'test_init_doc')
-      
-      try {
-        const testDoc = await getDoc(testConversationRef)
-        
-        if (!testDoc.exists()) {
-          await setDoc(testConversationRef, {
-            _isTestDoc: true,
-            _createdAt: serverTimestamp(),
-            participantIds: [userId],
-          })
-          console.log("Created test document to initialize conversations collection")
-        }
-      } catch (error) {
-        console.error("Error initializing conversations collection:", error)
-      }
-      
-      // Check if messages collection exists
-      const messagesRef = collection(db, 'messages')
-      const testMessageRef = doc(messagesRef, 'test_init_doc')
-      
-      try {
-        const testMessageDoc = await getDoc(testMessageRef)
-        
-        if (!testMessageDoc.exists()) {
-          await setDoc(testMessageRef, {
-            _isTestDoc: true,
-            _createdAt: serverTimestamp(),
-            senderId: userId,
-            conversationId: 'test_init_doc'
-          })
-          console.log("Created test document to initialize messages collection")
-        }
-      } catch (error) {
-        console.error("Error initializing messages collection:", error)
-      }
-    } catch (error) {
-      console.error("Error initializing collections:", error)
-    }
-  }
+  // Function to generate a consistent conversation ID for two users
+  const generateConversationId = (uid1: string, uid2: string): string => {
+    return [uid1, uid2].sort().join('_');
+  };
 
   const handleMessageClick = async () => {
     try {
@@ -99,46 +53,24 @@ export function MessageButton({
         return
       }
       
-      // Initialize collections if needed
-      await initializeCollections(user.uid)
+      // Generate the conversation ID
+      const conversationId = generateConversationId(user.uid, recipientId)
       
-      // Check if a conversation already exists between these users
-      const conversationsRef = collection(db, 'conversations')
-      const q = query(
-        conversationsRef,
-        where('participantIds', 'array-contains', user.uid)
-      )
+      // Check if the conversation already exists
+      const conversationRef = doc(db, 'conversations', conversationId)
+      const conversationDoc = await getDoc(conversationRef)
       
-      const querySnapshot = await getDocs(q)
-      let existingConversationId = null
-      
-      querySnapshot.forEach(doc => {
-        const data = doc.data()
-        if (data.participantIds.includes(recipientId)) {
-          existingConversationId = doc.id
-        }
-      })
-      
-      // Navigate to existing conversation if found
-      if (existingConversationId) {
-        router.push(`/messages?conversation=${existingConversationId}`)
-        return
+      if (!conversationDoc.exists()) {
+        // Create a new conversation with the generated ID
+        await setDoc(conversationRef, {
+          userIds: [user.uid, recipientId],
+          lastMessage: "No messages yet",
+          updatedAt: serverTimestamp()
+        })
       }
       
-      // Create a new conversation
-      const newConversation = await addDoc(conversationsRef, {
-        participantIds: [user.uid, recipientId],
-        lastMessageTime: serverTimestamp(),
-        lastMessage: "No messages yet",
-        createdAt: serverTimestamp(),
-        unreadCount: {
-          [user.uid]: 0,
-          [recipientId]: 0
-        }
-      })
-      
-      // Navigate to the new conversation
-      router.push(`/messages?conversation=${newConversation.id}`)
+      // Navigate to the conversation
+      router.push(`/messages?conversation=${conversationId}`)
     } catch (error) {
       console.error('Error starting conversation:', error)
       toast.error('Failed to start conversation')
