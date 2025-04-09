@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function SignUpPage() {
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12 md:py-16">
+    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-24 md:py-32 mt-12">
       <div className="w-full max-w-md">
         <AuthCard
           title="Create an Account"
