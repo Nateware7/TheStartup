@@ -6,9 +6,10 @@ import { Navbar } from "@/components/navbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AnimatedBackground } from "@/components/animated-background"
 import { AuctionLog } from "@/components/auction-log"
+import { MessageButton } from "@/components/message-button"
 import { useState, useEffect } from "react"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
-import { db } from "@/lib/firebaseConfig"
+import { db, auth } from "@/lib/firebaseConfig"
 import { usePathname } from "next/navigation"
 import { format } from "date-fns"
 
@@ -283,19 +284,34 @@ export default function ProductPage() {
             {/* Seller info header */}
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10 border border-zinc-800">
-                  <AvatarImage src={product.seller.avatar} alt={product.seller.name} />
-                  <AvatarFallback className="bg-gradient-to-br from-violet-600 to-indigo-600 text-xs text-white">
-                    {getInitials(product.seller.name)}
-                  </AvatarFallback>
-                </Avatar>
+                <Link href={`/profile/${product.seller.id}`}>
+                  <Avatar className="h-10 w-10 border border-zinc-800 cursor-pointer">
+                    <AvatarImage src={product.seller.avatar} alt={product.seller.name} />
+                    <AvatarFallback className="bg-gradient-to-br from-violet-600 to-indigo-600 text-xs text-white">
+                      {getInitials(product.seller.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                </Link>
                 <div>
                   <div className="flex items-center gap-1">
-                    <span className="font-medium text-zinc-200">{product.seller.name}</span>
+                    <Link href={`/profile/${product.seller.id}`} className="hover:underline">
+                      <span className="font-medium text-zinc-200">{product.seller.name}</span>
+                    </Link>
                     {product.seller.verified && <CheckCircle className="h-4 w-4 fill-indigo-500 text-white" />}
                   </div>
                   <div className="text-xs text-zinc-500">{product.seller.handle}</div>
                 </div>
+                {auth.currentUser?.uid !== product.seller.id && (
+                  <div className="ml-2">
+                    <MessageButton
+                      recipientId={product.seller.id}
+                      recipientName={product.seller.name}
+                      variant="outline"
+                      size="sm"
+                      className="border-zinc-700 text-white hover:bg-zinc-700"
+                    />
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <div className="rounded-full bg-zinc-800/70 px-3 py-1 text-sm font-medium text-white">
@@ -400,11 +416,21 @@ export default function ProductPage() {
                       <span className="text-zinc-300">{product.seller.rating}/5.0</span>
                     </div>
                   </div>
-                  <Link href={`/profile/${product.seller.id}`}>
-                    <button className="mt-4 w-full rounded-md border border-zinc-700 bg-zinc-800 px-4 py-2 font-medium text-white hover:bg-zinc-700 transition-colors">
-                      View Profile
-                    </button>
-                  </Link>
+                  <div className="mt-4 grid grid-cols-1 gap-2">
+                    <Link href={`/profile/${product.seller.id}`}>
+                      <button className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-4 py-2 font-medium text-white hover:bg-zinc-700 transition-colors">
+                        View Profile
+                      </button>
+                    </Link>
+                    {auth.currentUser?.uid !== product.seller.id && (
+                      <MessageButton
+                        recipientId={product.seller.id}
+                        recipientName={product.seller.name}
+                        variant="outline"
+                        className="w-full border-zinc-700 text-white hover:bg-zinc-700"
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {/* Share button */}

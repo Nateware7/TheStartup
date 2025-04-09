@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UserProducts } from "@/components/user-products"
 import { AnimatedBackground } from "@/components/animated-background"
+import { MessageButton } from "@/components/message-button"
 import { db, auth } from "@/lib/firebaseConfig"
 import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore"
 import { format } from "date-fns"
@@ -253,10 +254,12 @@ function UserProfileContent({ userId }: { userId: string }) {
                       </div>
                     ) : (
                       <div className="grid grid-cols-2 gap-2 mb-4">
-                        <Button className="w-full text-sm bg-gradient-to-r from-blue-500 to-violet-500 text-white hover:from-blue-600 hover:to-violet-600">
-                          <MessageCircle className="mr-1 h-4 w-4" />
-                          Message
-                        </Button>
+                        <MessageButton 
+                          recipientId={user.id}
+                          recipientName={user.username}
+                          className="w-full text-sm bg-gradient-to-r from-blue-500 to-violet-500 text-white hover:from-blue-600 hover:to-violet-600"
+                          size="default"
+                        />
                         <Button variant="outline" className="w-full text-sm border-zinc-800 text-white hover:bg-zinc-900">
                           Follow
                         </Button>

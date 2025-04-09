@@ -57,6 +57,7 @@ export function Navbar() {
     { name: "Marketplace", href: "/marketplace" },
     { name: "Sell", href: "/sell" },
     { name: "Subscribe", href: "/subscribe" },
+    { name: "Messages", href: "/messages", protected: true },
     { name: "My Account", href: "/dashboard", protected: true },
   ]
 
