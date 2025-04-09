@@ -1,3 +1,6 @@
+"use client"
+
+import { useState } from "react"
 import { ProductGrid } from "@/components/product-grid"
 import { Navbar } from "@/components/navbar"
 import { UnifiedHero } from "@/components/unified-hero"
@@ -6,6 +9,13 @@ import { CategoryTagCarousel } from "@/components/category-tag-carousel"
 import { SeamlessConnector } from "@/components/seamless-connector"
 
 export default function Home() {
+  const [activeFilter, setActiveFilter] = useState("All")
+  
+  // Handler for when category is selected from CategoryTagCarousel
+  const handleCategoryChange = (category: string) => {
+    setActiveFilter(category)
+  }
+  
   return (
     <AnimatedBackground>
       <div className="flex min-h-screen flex-col text-white">
@@ -34,8 +44,27 @@ export default function Home() {
               </div>
             </div>
 
-            <CategoryTagCarousel />
-            <ProductGrid />
+            {/* Pass the handler to CategoryTagCarousel */}
+            <div className="mb-6">
+              {/* Add asset type filter buttons */}
+              <div className="flex justify-center gap-3 mb-4">
+                {["All", "Usernames", "Accounts"].map((category) => (
+                  <button
+                    key={category}
+                    className={`relative flex-shrink-0 rounded-full px-5 py-1.5 text-xs font-medium transition-all duration-200 ${
+                      category === activeFilter
+                        ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm"
+                        : "bg-zinc-900/40 text-zinc-400 border border-zinc-800/80 hover:bg-zinc-800/60 hover:text-zinc-200"
+                    }`}
+                    onClick={() => setActiveFilter(category)}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <ProductGrid filter={activeFilter} />
           </section>
         </main>
       </div>

@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils"
 // Simplified categories for marketplace
 const categories = [
   { name: "All", active: true },
-  { name: "Usernames", active: false },
-  { name: "Accounts", active: false },
+  { name: "Usernames", active: false, assetType: "username" },
+  { name: "Accounts", active: false, assetType: "account" },
 ]
 
 export function CategoryTagCarousel() {
@@ -47,6 +47,17 @@ export function CategoryTagCarousel() {
 
     // Check scroll position after animation
     setTimeout(checkScrollPosition, 300)
+  }
+
+  // Function to handle category selection and filtering
+  const handleCategorySelect = (category: string) => {
+    setActiveCategory(category)
+    
+    // You would typically dispatch an event or call a context function here
+    // For example: dispatch({ type: 'SET_FILTER', payload: category === 'All' ? null : category })
+    
+    // For now we're just updating the local state
+    // In a real implementation, this would trigger filtering in the ProductGrid component
   }
 
   return (
@@ -95,7 +106,7 @@ export function CategoryTagCarousel() {
                     ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm"
                     : "bg-zinc-900/40 text-zinc-400 border border-zinc-800/80 hover:bg-zinc-800/60 hover:text-zinc-200",
                 )}
-                onClick={() => setActiveCategory(category.name)}
+                onClick={() => handleCategorySelect(category.name)}
               >
                 {category.name}
               </button>

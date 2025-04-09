@@ -29,6 +29,7 @@ const fixedPriceSchema = z.object({
   description: z.string().min(10, "Description must be at least 10 characters").max(200),
   longDescription: z.string().min(20, "Description must be at least 20 characters").max(1000),
   category: z.string().min(1, "Category is required"),
+  assetType: z.string().min(1, "Asset type is required"),
   price: z.coerce.number().min(1, "Price must be at least 1"),
   status: z.string()
 })
@@ -38,6 +39,7 @@ const auctionSchema = z.object({
   description: z.string().min(10, "Description must be at least 10 characters").max(200),
   longDescription: z.string().min(20, "Description must be at least 20 characters").max(1000),
   category: z.string().min(1, "Category is required"),
+  assetType: z.string().min(1, "Asset type is required"),
   startingBid: z.coerce.number().min(1, "Starting bid must be at least 1"),
   status: z.string()
 })
@@ -59,6 +61,7 @@ export default function SellPage() {
       description: "",
       longDescription: "",
       category: "insta",
+      assetType: "username",
       price: 0,
       status: "active"
     }
@@ -72,6 +75,7 @@ export default function SellPage() {
       description: "",
       longDescription: "",
       category: "insta",
+      assetType: "username",
       startingBid: 0,
       status: "active"
     }
@@ -106,6 +110,7 @@ export default function SellPage() {
         description: data.description,
         longDescription: data.longDescription,
         category: data.category,
+        assetType: data.assetType,
         price: data.price,
         sellerId: userId,
         isAuction: false,
@@ -140,6 +145,7 @@ export default function SellPage() {
         description: data.description,
         longDescription: data.longDescription,
         category: data.category,
+        assetType: data.assetType,
         price: data.startingBid, // Use startingBid as the price
         startingBid: data.startingBid,
         currentBid: data.startingBid, // Initially, current bid equals starting bid
@@ -203,6 +209,22 @@ export default function SellPage() {
                         />
                         {fixedPriceForm.formState.errors.title && (
                           <p className="text-sm text-red-500">{fixedPriceForm.formState.errors.title.message}</p>
+                        )}
+                      </div>
+                      
+                      {/* Asset Type */}
+                      <div className="space-y-2">
+                        <Label htmlFor="fixed-assetType">Asset Type</Label>
+                        <select
+                          id="fixed-assetType"
+                          {...fixedPriceForm.register("assetType")}
+                          className="w-full p-2 rounded-md bg-zinc-800/50 border border-zinc-700 text-white"
+                        >
+                          <option value="username">Username</option>
+                          <option value="account">Account</option>
+                        </select>
+                        {fixedPriceForm.formState.errors.assetType && (
+                          <p className="text-sm text-red-500">{fixedPriceForm.formState.errors.assetType.message}</p>
                         )}
                       </div>
                       
@@ -327,6 +349,22 @@ export default function SellPage() {
                         />
                         {auctionForm.formState.errors.title && (
                           <p className="text-sm text-red-500">{auctionForm.formState.errors.title.message}</p>
+                        )}
+                      </div>
+                      
+                      {/* Asset Type */}
+                      <div className="space-y-2">
+                        <Label htmlFor="auction-assetType">Asset Type</Label>
+                        <select
+                          id="auction-assetType"
+                          {...auctionForm.register("assetType")}
+                          className="w-full p-2 rounded-md bg-zinc-800/50 border border-zinc-700 text-white"
+                        >
+                          <option value="username">Username</option>
+                          <option value="account">Account</option>
+                        </select>
+                        {auctionForm.formState.errors.assetType && (
+                          <p className="text-sm text-red-500">{auctionForm.formState.errors.assetType.message}</p>
                         )}
                       </div>
                       

@@ -14,6 +14,7 @@ type Product = {
   currentBid?: number;
   price: number;
   category: string;
+  assetType?: string;
   sellerId: string;
   seller?: {
     id: string;
@@ -29,8 +30,13 @@ type Product = {
   status: "active" | "sold";
 };
 
-export function ProductGrid() {
+interface ProductGridProps {
+  filter?: string;
+}
+
+export function ProductGrid({ filter }: ProductGridProps = {}) {
   const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,6 +55,7 @@ export function ProductGrid() {
             currentBid: data.currentBid,
             price: data.price || 0,
             category: data.category || "Other",
+            assetType: data.assetType || "username",
             sellerId: data.sellerId || "",
             createdAt: data.createdAt,
             status: data.status || "active",
@@ -98,6 +105,7 @@ export function ProductGrid() {
         }));
         
         setProducts(productsData);
+        setFilteredProducts(productsData);
       } catch (error) {
         console.error("Error fetching products:", error);
       } finally {
@@ -107,6 +115,22 @@ export function ProductGrid() {
 
     fetchProducts();
   }, []);
+
+  // Apply filter when it changes
+  useEffect(() => {
+    if (!filter || filter === "All") {
+      setFilteredProducts(products);
+    } else {
+      // Convert filter to correct format for comparison
+      const assetTypeFilter = filter === "Usernames" ? "username" : filter === "Accounts" ? "account" : null;
+      
+      if (assetTypeFilter) {
+        setFilteredProducts(products.filter(product => product.assetType === assetTypeFilter));
+      } else {
+        setFilteredProducts(products);
+      }
+    }
+  }, [filter, products]);
 
   if (loading) {
     return (
@@ -118,18 +142,18 @@ export function ProductGrid() {
     );
   }
 
-  if (products.length === 0) {
+  if (filteredProducts.length === 0) {
     return (
       <div className="text-center py-12">
         <h3 className="text-xl text-zinc-300 mb-2">No Products Available</h3>
-        <p className="text-zinc-500">Check back later for new listings</p>
+        <p className="text-zinc-500">Check back later for new listings{filter && filter !== "All" ? ` or try a different filter` : ''}</p>
       </div>
     );
   }
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {products.map((product) => (
+      {filteredProducts.map((product) => (
         <ProductCard key={product.id} product={product} />
       ))}
     </div>

@@ -1,3 +1,6 @@
+"use client"
+
+import { useState } from "react"
 import { Navbar } from "@/components/navbar"
 import { ProductGrid } from "@/components/product-grid"
 import { AnimatedBackground } from "@/components/animated-background"
@@ -5,6 +8,8 @@ import { RefinedTrustCard } from "@/components/refined-trust-card"
 import { SubscriptionBanner } from "@/components/subscription-banner"
 
 export default function MarketplacePage() {
+  const [activeFilter, setActiveFilter] = useState("All")
+  
   return (
     <AnimatedBackground>
       <div className="min-h-screen text-white">
@@ -48,10 +53,12 @@ export default function MarketplacePage() {
                 <button
                   key={category}
                   className={`relative flex-shrink-0 rounded-full px-5 py-1.5 text-xs font-medium transition-all duration-200 ${
-                    category === "All"
+                    category === activeFilter
                       ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm"
                       : "bg-zinc-900/40 text-zinc-400 border border-zinc-800/80 hover:bg-zinc-800/60 hover:text-zinc-200"
                   }`}
+                  aria-label={category === "All" ? "Show all listings" : `Show only ${category.toLowerCase()}`}
+                  onClick={() => setActiveFilter(category)}
                 >
                   {category}
                 </button>
@@ -71,7 +78,7 @@ export default function MarketplacePage() {
 
           {/* Product Grid */}
           <section className="container mx-auto px-4 mb-16">
-            <ProductGrid />
+            <ProductGrid filter={activeFilter} />
 
             <div className="mt-8 flex justify-center">
               <button className="rounded-full border border-zinc-800 bg-zinc-900/50 px-6 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white">

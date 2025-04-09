@@ -28,6 +28,7 @@ interface Product {
   startingBid?: number
   currentBid?: number
   category: string
+  assetType?: string
   seller?: Seller
   stats?: {
     sales: number
@@ -97,8 +98,15 @@ export function ProductCard({ product }: { product: Product }) {
                 )}
               </div>
             </Link>
-            <div className="rounded-full bg-zinc-800/50 px-2 py-0.5 text-[10px] font-medium text-zinc-400">
-              {product.category}
+            <div className="flex items-center gap-1.5">
+              {product.assetType && (
+                <div className="rounded-full bg-zinc-800/70 px-2 py-0.5 text-[10px] font-medium text-zinc-300">
+                  {product.assetType === "username" ? "Username" : "Account"}
+                </div>
+              )}
+              <div className="rounded-full bg-zinc-800/50 px-2 py-0.5 text-[10px] font-medium text-zinc-400">
+                {product.category}
+              </div>
             </div>
           </div>
         </div>

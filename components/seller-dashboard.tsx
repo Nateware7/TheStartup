@@ -48,6 +48,7 @@ interface Listing {
   type: string
   category: string
   platform?: string
+  assetType?: string
   price: number
   isAuction?: boolean
   currentBid?: number
@@ -143,6 +144,7 @@ export function SellerDashboard() {
             type: data.category || "Other",
             category: data.category || "Other",
             platform: data.platform || "",
+            assetType: data.assetType || "username",
             price: data.price || 0,
             isAuction: data.isAuction !== undefined ? data.isAuction : !!data.currentBid,
             currentBid: data.currentBid,
@@ -331,8 +333,15 @@ export function SellerDashboard() {
                   <thead>
                     <tr className="border-b border-zinc-800/50">
                       <th className="px-4 py-3 text-left text-sm font-medium text-zinc-400">Product</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-zinc-400">Type</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-zinc-400">Price</th>
+                      <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase text-zinc-500">
+                        Type
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase text-zinc-500">
+                        Asset Type
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase text-zinc-500">
+                        Price
+                      </th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-zinc-400">Status</th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-zinc-400">Actions</th>
                     </tr>
@@ -359,6 +368,7 @@ export function SellerDashboard() {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-sm">{listing.type}</td>
+                          <td className="px-4 py-3 text-sm">{listing.assetType || "username"}</td>
                           <td className="px-4 py-3">
                             {listing.isAuction ? (
                               <div>
@@ -476,7 +486,7 @@ export function SellerDashboard() {
                           <div>
                             <div className="font-medium">{listing.title}</div>
                             <div className="text-xs text-zinc-500">
-                              {listing.platform || listing.category} • {listing.type}
+                              {listing.platform || listing.category} • {listing.type} • {listing.assetType || "username"}
                             </div>
                           </div>
                         </div>

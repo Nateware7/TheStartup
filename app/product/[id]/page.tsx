@@ -25,6 +25,7 @@ interface Product {
   currentBid: number;
   price: number;
   category: string;
+  assetType: string;
   seller: {
     id: string;
     name: string;
@@ -110,6 +111,7 @@ export default function ProductPage() {
             currentBid: data.currentBid || 0,
             price: data.price || 0,
             category: data.category || "",
+            assetType: data.assetType || "username",
             seller: sellerInfo,
             createdAt: data.createdAt || new Date(),
             status: data.status || "active",
@@ -295,8 +297,13 @@ export default function ProductPage() {
                   <div className="text-xs text-zinc-500">{product.seller.handle}</div>
                 </div>
               </div>
-              <div className="rounded-full bg-zinc-800/70 px-3 py-1 text-sm font-medium text-zinc-400">
-                {product.category}
+              <div className="flex items-center gap-2">
+                <div className="rounded-full bg-zinc-800/70 px-3 py-1 text-sm font-medium text-white">
+                  {product.assetType}
+                </div>
+                <div className="rounded-full bg-zinc-800/70 px-3 py-1 text-sm font-medium text-zinc-400">
+                  {product.category}
+                </div>
               </div>
             </div>
 
