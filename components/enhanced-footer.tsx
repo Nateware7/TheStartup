@@ -6,10 +6,6 @@ import { motion } from "framer-motion"
 import { usePathname } from "next/navigation"
 import {
   ChevronUp,
-  Users,
-  ShoppingBag,
-  Award,
-  Clock,
   Twitter,
   Instagram,
   Facebook,
@@ -17,33 +13,7 @@ import {
   ShoppingCartIcon as Paypal,
   Bitcoin,
 } from "lucide-react"
-
-const stats = [
-  {
-    icon: Users,
-    value: "12,500+",
-    label: "Active Users",
-    delay: 0.1,
-  },
-  {
-    icon: ShoppingBag,
-    value: "45,000+",
-    label: "Products Sold",
-    delay: 0.2,
-  },
-  {
-    icon: Award,
-    value: "2,300+",
-    label: "Verified Creators",
-    delay: 0.3,
-  },
-  {
-    icon: Clock,
-    value: "24/7",
-    label: "Support Available",
-    delay: 0.4,
-  },
-]
+import { fetchSiteStats, SiteStat } from "@/lib/stats"
 
 const quickLinks = [
   { name: "Home", href: "/" },
@@ -70,6 +40,8 @@ const paymentMethods = [
 export function EnhancedFooter() {
   const [mounted, setMounted] = useState(false)
   const [showBackToTop, setShowBackToTop] = useState(false)
+  const [stats, setStats] = useState<SiteStat[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const pathname = usePathname()
 
   // Check if we're on an auth page
@@ -81,9 +53,29 @@ export function EnhancedFooter() {
     const handleScroll = () => {
       setShowBackToTop(window.scrollY > 500)
     }
+    
+    // Load dynamic stats
+    async function loadStats() {
+      try {
+        const siteStats = await fetchSiteStats()
+        setStats(siteStats)
+      } catch (error) {
+        console.error("Error loading stats:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    
+    loadStats()
+    
+    // Set up interval to refresh stats
+    const interval = setInterval(loadStats, 5 * 60 * 1000) // Refresh every 5 minutes
 
     window.addEventListener("scroll", handleScroll)
-    return () => window.removeEventListener("scroll", handleScroll)
+    return () => {
+      window.removeEventListener("scroll", handleScroll)
+      clearInterval(interval)
+    }
   }, [])
 
   const scrollToTop = () => {
@@ -112,23 +104,40 @@ export function EnhancedFooter() {
         {!isAuthPage && (
           <div className="container mx-auto px-4 pt-16 pb-10">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {stats.map((stat, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: mounted ? 1 : 0, y: mounted ? 0 : 20 }}
-                  transition={{ duration: 0.5, delay: stat.delay }}
-                  className="flex items-center gap-4 rounded-xl border border-violet-500/10 bg-zinc-900/50 p-4 shadow-lg backdrop-blur-sm"
-                >
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/20 to-indigo-500/20 shadow-lg shadow-violet-500/5">
-                    <stat.icon className="h-6 w-6 text-violet-400" />
+              {isLoading ? (
+                // Loading skeleton
+                [...Array(4)].map((_, i) => (
+                  <div 
+                    key={i} 
+                    className="flex items-center gap-4 rounded-xl border border-violet-500/10 bg-zinc-900/50 p-4 shadow-lg backdrop-blur-sm animate-pulse"
+                  >
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-zinc-800"></div>
+                    <div>
+                      <div className="h-5 w-16 rounded bg-zinc-800"></div>
+                      <div className="mt-1 h-3 w-24 rounded bg-zinc-800"></div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-xl font-bold text-white">{stat.value}</div>
-                    <div className="text-sm text-zinc-400">{stat.label}</div>
-                  </div>
-                </motion.div>
-              ))}
+                ))
+              ) : (
+                // Actual stats
+                stats.map((stat, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: mounted ? 1 : 0, y: mounted ? 0 : 20 }}
+                    transition={{ duration: 0.5, delay: stat.delay }}
+                    className="flex items-center gap-4 rounded-xl border border-violet-500/10 bg-zinc-900/50 p-4 shadow-lg backdrop-blur-sm"
+                  >
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/20 to-indigo-500/20 shadow-lg shadow-violet-500/5">
+                      {stat.icon && <stat.icon className="h-6 w-6 text-violet-400" />}
+                    </div>
+                    <div>
+                      <div className="text-xl font-bold text-white">{stat.value}</div>
+                      <div className="text-sm text-zinc-400">{stat.label}</div>
+                    </div>
+                  </motion.div>
+                ))
+              )}
             </div>
           </div>
         )}
