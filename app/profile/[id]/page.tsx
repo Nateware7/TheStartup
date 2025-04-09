@@ -296,19 +296,13 @@ function UserProfileContent({ userId }: { userId: string }) {
             <div className="lg:col-span-9">
               {/* Content tabs */}
               <div className="bg-zinc-900/80 rounded-xl backdrop-blur-md border border-zinc-800/60 shadow-xl overflow-hidden">
-                {/* Tab navigation */}
-                <div className="grid grid-cols-3 border-b border-zinc-800">
+                {/* Tab navigation - remove collections tab */}
+                <div className="grid grid-cols-2 border-b border-zinc-800">
                   <button 
                     className={`py-4 font-medium text-center transition-colors ${activeTab === "products" ? "text-white bg-gradient-to-r from-violet-500/10 to-blue-500/10 border-b-2 border-violet-500" : "text-zinc-400 hover:text-white"}`}
                     onClick={() => setActiveTab("products")}
                   >
                     Products
-                  </button>
-                  <button 
-                    className={`py-4 font-medium text-center transition-colors ${activeTab === "collections" ? "text-white bg-gradient-to-r from-violet-500/10 to-blue-500/10 border-b-2 border-violet-500" : "text-zinc-400 hover:text-white"}`}
-                    onClick={() => setActiveTab("collections")}
-                  >
-                    Collections
                   </button>
                   <button 
                     className={`py-4 font-medium text-center transition-colors ${activeTab === "reviews" ? "text-white bg-gradient-to-r from-violet-500/10 to-blue-500/10 border-b-2 border-violet-500" : "text-zinc-400 hover:text-white"}`}
@@ -322,13 +316,6 @@ function UserProfileContent({ userId }: { userId: string }) {
                 <div className="p-6">
                   {activeTab === "products" && (
                     <UserProducts userId={user.id} />
-                  )}
-                  
-                  {activeTab === "collections" && (
-                    <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center backdrop-blur-sm">
-                      <h3 className="text-lg font-medium">No Collections Yet</h3>
-                      <p className="mt-2 text-zinc-400">This user hasn't created any collections yet.</p>
-                    </div>
                   )}
                   
                   {activeTab === "reviews" && (

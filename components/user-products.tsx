@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Image from "next/image"
 import Link from "next/link"
-import { Heart, Loader } from "lucide-react"
+import { Loader, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { db } from "@/lib/firebaseConfig"
 import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore"
 import { ProductCard } from "@/components/product-card"
@@ -23,6 +23,9 @@ type Product = {
   bid?: number | null
   image?: string
   sellerId?: string
+  assetType?: string
+  status?: string
+  isAuction?: boolean
   seller?: {
     id: string
     name: string
@@ -41,7 +44,9 @@ interface UserProductsProps {
 
 export function UserProducts({ userId }: UserProductsProps) {
   const [products, setProducts] = useState<Product[]>([])
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeFilter, setActiveFilter] = useState("all")
 
   useEffect(() => {
     async function fetchUserProducts() {
@@ -68,7 +73,10 @@ export function UserProducts({ userId }: UserProductsProps) {
             currentBid: data.currentBid,
             bid: data.currentBid || null,
             image: data.image || "/placeholder.svg?height=600&width=600",
-            sellerId: userId
+            sellerId: userId,
+            assetType: data.assetType || "username",
+            status: data.status || "active",
+            isAuction: data.isAuction || false
           })
         })
         
@@ -94,6 +102,7 @@ export function UserProducts({ userId }: UserProductsProps) {
         }
         
         setProducts(userProducts)
+        setFilteredProducts(userProducts)
       } catch (error) {
         console.error("Error fetching user products:", error)
       } finally {
@@ -103,6 +112,15 @@ export function UserProducts({ userId }: UserProductsProps) {
     
     fetchUserProducts()
   }, [userId])
+  
+  // Filter products when tab changes
+  useEffect(() => {
+    if (activeFilter === "all") {
+      setFilteredProducts(products)
+    } else {
+      setFilteredProducts(products.filter(product => product.status === activeFilter))
+    }
+  }, [activeFilter, products])
   
   if (loading) {
     return (
@@ -121,11 +139,49 @@ export function UserProducts({ userId }: UserProductsProps) {
     )
   }
 
+  // Count products by status for the tabs 
+  const activeCount = products.filter(p => p.status === "active").length
+  const draftCount = products.filter(p => p.status === "draft").length
+  const soldCount = products.filter(p => p.status === "sold").length
+
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-      {products.map((product) => (
-        <ProductCard key={product.id} product={product} />
-      ))}
+    <div>
+      {/* Tabs for filtering */}
+      <Tabs defaultValue="all" value={activeFilter} onValueChange={setActiveFilter} className="mb-6">
+        <TabsList className="bg-zinc-800/30 border border-zinc-700/30 rounded-lg p-1">
+          <TabsTrigger value="all" className="data-[state=active]:bg-zinc-700 data-[state=active]:text-white">
+            All ({products.length})
+          </TabsTrigger>
+          <TabsTrigger value="active" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+            Active ({activeCount})
+          </TabsTrigger>
+          <TabsTrigger value="draft" className="data-[state=active]:bg-amber-600 data-[state=active]:text-white">
+            Draft ({draftCount})
+          </TabsTrigger>
+          <TabsTrigger value="sold" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            Sold ({soldCount})
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {/* Product Grid - using ProductCard component from main page */}
+      {filteredProducts.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredProducts.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center backdrop-blur-sm">
+          <AlertCircle className="h-8 w-8 mx-auto mb-2 text-zinc-500" />
+          <h3 className="text-lg font-medium">No Products Found</h3>
+          <p className="mt-2 text-zinc-400">
+            {activeFilter === "all" 
+              ? "This user hasn't listed any products yet." 
+              : `No ${activeFilter} products found.`}
+          </p>
+        </div>
+      )}
     </div>
   )
 }

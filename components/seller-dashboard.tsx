@@ -68,6 +68,26 @@ interface Stats {
   color: string
 }
 
+// Helper function to get avatar color based on title
+function getAvatarColor(title: string) {
+  if (!title || title.length === 0) return "bg-zinc-800 text-zinc-300";
+  
+  // Use the character code to determine a color
+  const charCode = title.charCodeAt(0) % 8;
+  
+  switch(charCode) {
+    case 0: return "bg-gradient-to-br from-violet-600 to-indigo-800 text-white";
+    case 1: return "bg-gradient-to-br from-blue-600 to-cyan-800 text-white";
+    case 2: return "bg-gradient-to-br from-emerald-600 to-teal-800 text-white";
+    case 3: return "bg-gradient-to-br from-amber-500 to-orange-700 text-white";
+    case 4: return "bg-gradient-to-br from-pink-600 to-rose-800 text-white";
+    case 5: return "bg-gradient-to-br from-indigo-600 to-purple-800 text-white";
+    case 6: return "bg-gradient-to-br from-teal-600 to-emerald-800 text-white";
+    case 7: return "bg-gradient-to-br from-red-600 to-rose-800 text-white";
+    default: return "bg-gradient-to-br from-violet-600 to-indigo-800 text-white";
+  }
+}
+
 export function SellerDashboard() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("all")
@@ -334,7 +354,7 @@ export function SellerDashboard() {
                     <tr className="border-b border-zinc-800/50">
                       <th className="px-4 py-3 text-left text-sm font-medium text-zinc-400">Product</th>
                       <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase text-zinc-500">
-                        Type
+                        Platform
                       </th>
                       <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase text-zinc-500">
                         Asset Type
@@ -352,18 +372,13 @@ export function SellerDashboard() {
                         <tr key={listing.id} className="border-b border-zinc-800/50">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
-                              <Avatar className="h-8 w-8 rounded-md border border-zinc-800">
-                                {listing.image ? (
-                                  <AvatarImage src={listing.image} alt={listing.title} />
-                                ) : (
-                                <AvatarFallback className="rounded-md bg-zinc-800 text-xs">
-                                    {listing.category.substring(0, 2).toUpperCase()}
-                                </AvatarFallback>
-                                )}
-                              </Avatar>
+                              <div className="h-8 w-8 rounded-md flex items-center justify-center overflow-hidden shadow-md">
+                                <div className={`w-full h-full ${getAvatarColor(listing.title)} flex items-center justify-center transition-transform duration-200 hover:scale-110`}>
+                                  <span className="font-bold">{listing.title.charAt(0).toUpperCase()}</span>
+                                </div>
+                              </div>
                               <div>
                                 <div className="font-medium">{listing.title}</div>
-                                <div className="text-xs text-zinc-500">{listing.platform || listing.category}</div>
                               </div>
                             </div>
                           </td>
@@ -474,19 +489,15 @@ export function SellerDashboard() {
                     <div key={listing.id} className="rounded-lg border border-zinc-800/50 bg-zinc-800/30 p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10 rounded-md border border-zinc-800">
-                            {listing.image ? (
-                              <AvatarImage src={listing.image} alt={listing.title} />
-                            ) : (
-                            <AvatarFallback className="rounded-md bg-zinc-800 text-xs">
-                                {listing.category.substring(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                            )}
-                          </Avatar>
+                          <div className="h-10 w-10 rounded-md flex items-center justify-center overflow-hidden shadow-md">
+                            <div className={`w-full h-full ${getAvatarColor(listing.title)} flex items-center justify-center transition-transform duration-200 hover:scale-110`}>
+                              <span className="font-bold">{listing.title.charAt(0).toUpperCase()}</span>
+                            </div>
+                          </div>
                           <div>
                             <div className="font-medium">{listing.title}</div>
                             <div className="text-xs text-zinc-500">
-                              {listing.platform || listing.category} • {listing.type} • {listing.assetType || "username"}
+                             {listing.type} • {listing.assetType || "username"}
                             </div>
                           </div>
                         </div>

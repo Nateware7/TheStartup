@@ -77,7 +77,7 @@ export function ProductCard({ product }: { product: Product }) {
 
   return (
     <>
-      <div className="rounded-lg overflow-hidden bg-gradient-to-b from-zinc-900 to-zinc-900/90 via-indigo-950/10 border border-zinc-800/50 transition-all hover:border-zinc-700/50">
+      <div className="h-full rounded-lg overflow-hidden bg-gradient-to-b from-zinc-900 to-zinc-900/90 via-indigo-950/10 border border-zinc-800/50 transition-all hover:border-zinc-700/50 flex flex-col">
         {/* Header - Seller info */}
         <div className="p-4 border-b border-zinc-800/30">
           <div className="flex items-center justify-between">
@@ -98,7 +98,7 @@ export function ProductCard({ product }: { product: Product }) {
                 )}
               </div>
             </Link>
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-col items-end gap-1">
               {product.assetType && (
                 <div className="rounded-full bg-zinc-800/70 px-2 py-0.5 text-[10px] font-medium text-zinc-300">
                   {product.assetType === "username" ? "Username" : "Account"}
@@ -112,18 +112,20 @@ export function ProductCard({ product }: { product: Product }) {
         </div>
 
         {/* Content - Product info */}
-        <div className="p-4">
-          <Link href={`/product/${product.id}`}>
-            <h3 className="mb-1 text-base font-bold leading-tight text-white hover:text-violet-300 transition-colors">
-              {product.title}
-            </h3>
-          </Link>
-          <p className="line-clamp-1 text-xs text-zinc-400 mb-3">{product.description}</p>
+        <div className="p-4 flex-1 flex flex-col">
+          <div className="flex-1">
+            <Link href={`/product/${product.id}`}>
+              <h3 className="mb-1 text-base font-bold leading-tight text-white hover:text-violet-300 transition-colors line-clamp-1">
+                {product.title}
+              </h3>
+            </Link>
+            <p className="line-clamp-1 text-xs text-zinc-400 mb-3">{product.description}</p>
+          </div>
 
-          {/* Price info */}
-          <div className="mb-3">
+          {/* Price info - Fixed height regardless of auction or buy-now */}
+          <div className="mb-3 h-12 flex items-end">
             {isAuction ? (
-              <>
+              <div className="w-full">
                 <div className="flex justify-between items-end">
                   <div>
                     <div className="text-[10px] text-zinc-500">Starting Bid</div>
@@ -134,14 +136,16 @@ export function ProductCard({ product }: { product: Product }) {
                     <div className="text-sm font-bold text-emerald-400">${typeof product.currentBid === 'number' ? product.currentBid.toFixed(2) : '0.00'}</div>
                   </div>
                 </div>
-              </>
+              </div>
             ) : (
-              <div className="text-base font-bold text-white">${product.price.toFixed(2)}</div>
+              <div className="flex items-end h-full">
+                <div className="text-base font-bold text-white">${product.price.toFixed(2)}</div>
+              </div>
             )}
           </div>
 
-          {/* Action buttons */}
-          <div className="flex gap-2 mb-3">
+          {/* Action buttons - fixed height */}
+          <div className="flex gap-2 h-9">
             {isAuction ? (
               <button
                 className="flex-1 rounded-md bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-1.5 text-xs font-medium text-white"
@@ -158,7 +162,7 @@ export function ProductCard({ product }: { product: Product }) {
               </button>
             )}
             <Link href={`/product/${product.id}`} className="block">
-              <button className="rounded-md border border-zinc-700 bg-zinc-800/40 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 transition-colors cursor-pointer">
+              <button className="h-full rounded-md border border-zinc-700 bg-zinc-800/40 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 transition-colors cursor-pointer">
                 Details
               </button>
             </Link>
