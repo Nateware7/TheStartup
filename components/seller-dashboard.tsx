@@ -75,41 +75,41 @@ export function SellerDashboard() {
   const [filteredListings, setFilteredListings] = useState<Listing[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [stats, setStats] = useState<Stats[]>([
-    {
-      title: "Total Revenue",
+  {
+    title: "Total Revenue",
       value: "$0.00",
       change: "0%",
-      isPositive: true,
-      icon: DollarSign,
-      color: "from-emerald-500 to-teal-500",
-    },
-    {
-      title: "Total Sales",
+    isPositive: true,
+    icon: DollarSign,
+    color: "from-emerald-500 to-teal-500",
+  },
+  {
+    title: "Total Sales",
       value: "0",
-      subtext: "Products Sold",
+    subtext: "Products Sold",
+      change: "0",
+    isPositive: true,
+    icon: ShoppingBag,
+    color: "from-blue-500 to-indigo-500",
+  },
+  {
+    title: "Active Listings",
+      value: "0",
+    subtext: "Live Listings",
       change: "0",
       isPositive: true,
-      icon: ShoppingBag,
-      color: "from-blue-500 to-indigo-500",
-    },
-    {
-      title: "Active Listings",
+    icon: Tag,
+    color: "from-violet-500 to-purple-500",
+  },
+  {
+    title: "Draft Listings",
       value: "0",
-      subtext: "Live Listings",
+    subtext: "Not Yet Published",
       change: "0",
-      isPositive: true,
-      icon: Tag,
-      color: "from-violet-500 to-purple-500",
-    },
-    {
-      title: "Pending Review",
-      value: "0",
-      subtext: "Awaiting Approval",
-      change: "0",
-      isPositive: true,
-      icon: Clock,
-      color: "from-amber-500 to-orange-500",
-    },
+    isPositive: true,
+    icon: Clock,
+    color: "from-amber-500 to-orange-500",
+  },
   ])
 
   // Fetch user listings
@@ -157,7 +157,7 @@ export function SellerDashboard() {
         
         // Compute stats
         const activeListings = fetchedListings.filter(listing => listing.status === "active").length
-        const pendingListings = fetchedListings.filter(listing => listing.status === "pending").length
+        const draftListings = fetchedListings.filter(listing => listing.status === "draft").length
         const soldItems = fetchedListings.filter(listing => listing.status === "sold").length
         
         // Calculate total revenue
@@ -199,9 +199,9 @@ export function SellerDashboard() {
             color: "from-violet-500 to-purple-500",
           },
           {
-            title: "Pending Review",
-            value: pendingListings.toString(),
-            subtext: "Awaiting Approval",
+            title: "Draft Listings",
+            value: draftListings.toString(),
+            subtext: "Not Yet Published",
             change: "+0", // You would calculate this from historical data
             isPositive: true,
             icon: Clock,
@@ -225,20 +225,20 @@ export function SellerDashboard() {
     if (!listings) return
     
     const filtered = listings.filter((listing) => {
-      // Filter by tab
-      if (activeTab !== "all" && listing.status !== activeTab) {
-        return false
-      }
+    // Filter by tab
+    if (activeTab !== "all" && listing.status !== activeTab) {
+      return false
+    }
 
       // Filter by search query (search in title and category)
       if (searchQuery && 
          !listing.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
          !listing.category.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false
-      }
+      return false
+    }
 
-      return true
-    })
+    return true
+  })
     
     setFilteredListings(filtered)
   }, [listings, activeTab, searchQuery])
@@ -318,9 +318,6 @@ export function SellerDashboard() {
                 <TabsTrigger value="sold" className="rounded-md px-3 py-1 text-sm data-[state=active]:bg-violet-600">
                   Sold
                 </TabsTrigger>
-                <TabsTrigger value="pending" className="rounded-md px-3 py-1 text-sm data-[state=active]:bg-violet-600">
-                  Pending
-                </TabsTrigger>
                 <TabsTrigger value="draft" className="rounded-md px-3 py-1 text-sm data-[state=active]:bg-violet-600">
                   Drafts
                 </TabsTrigger>
@@ -350,9 +347,9 @@ export function SellerDashboard() {
                                 {listing.image ? (
                                   <AvatarImage src={listing.image} alt={listing.title} />
                                 ) : (
-                                  <AvatarFallback className="rounded-md bg-zinc-800 text-xs">
+                                <AvatarFallback className="rounded-md bg-zinc-800 text-xs">
                                     {listing.category.substring(0, 2).toUpperCase()}
-                                  </AvatarFallback>
+                                </AvatarFallback>
                                 )}
                               </Avatar>
                               <div>
@@ -385,7 +382,7 @@ export function SellerDashboard() {
                                 </Link>
                               )}
 
-                              {(listing.status === "active" || listing.status === "draft" || listing.status === "pending") && (
+                              {(listing.status === "active" || listing.status === "draft") && (
                                 <Link href={`/edit-listing/${listing.id}`}>
                                   <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white" title="Edit Listing">
                                     <Edit className="h-4 w-4" />
@@ -421,11 +418,11 @@ export function SellerDashboard() {
                                       className="flex items-center gap-2 text-zinc-400 hover:text-white cursor-pointer"
                                       onClick={async () => {
                                         try {
-                                          await updateDoc(doc(db, "listings", listing.id), { status: "pending" })
-                                          toast.success("Listing submitted for review")
+                                          await updateDoc(doc(db, "listings", listing.id), { status: "active" })
+                                          toast.success("Listing published successfully")
                                           // Update listings
                                           setListings(listings.map(item => 
-                                            item.id === listing.id ? {...item, status: "pending"} : item
+                                            item.id === listing.id ? {...item, status: "active"} : item
                                           ))
                                         } catch (error) {
                                           toast.error("Failed to publish listing")
@@ -471,9 +468,9 @@ export function SellerDashboard() {
                             {listing.image ? (
                               <AvatarImage src={listing.image} alt={listing.title} />
                             ) : (
-                              <AvatarFallback className="rounded-md bg-zinc-800 text-xs">
+                            <AvatarFallback className="rounded-md bg-zinc-800 text-xs">
                                 {listing.category.substring(0, 2).toUpperCase()}
-                              </AvatarFallback>
+                            </AvatarFallback>
                             )}
                           </Avatar>
                           <div>
@@ -498,28 +495,27 @@ export function SellerDashboard() {
                       <div className="flex justify-end gap-2">
                         {listing.status === "active" && (
                           <Link href={`/product/${listing.id}`}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="border-zinc-700 bg-zinc-800/50 text-white hover:bg-zinc-700"
-                            >
-                              <Eye className="mr-1 h-3 w-3" />
-                              View
-                            </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-zinc-700 bg-zinc-800/50 text-white hover:bg-zinc-700"
+                          >
+                            <Eye className="mr-1 h-3 w-3" />
+                            View
+                          </Button>
                           </Link>
                         )}
                         {(listing.status === "active" ||
-                          listing.status === "draft" ||
-                          listing.status === "pending") && (
+                          listing.status === "draft") && (
                           <Link href={`/edit-listing/${listing.id}`}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="border-zinc-700 bg-zinc-800/50 text-white hover:bg-zinc-700"
-                            >
-                              <Edit className="mr-1 h-3 w-3" />
-                              Edit
-                            </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-zinc-700 bg-zinc-800/50 text-white hover:bg-zinc-700"
+                          >
+                            <Edit className="mr-1 h-3 w-3" />
+                            Edit
+                          </Button>
                           </Link>
                         )}
                         <Button
@@ -594,11 +590,6 @@ function StatusBadge({ status, isAuction }: { status: string, isAuction: boolean
       textColor = "text-blue-500"
       label = "Sold"
       break
-    case "pending":
-      bgColor = "bg-amber-500/10"
-      textColor = "text-amber-500"
-      label = "Pending Review"
-      break
     case "draft":
       bgColor = "bg-zinc-500/10"
       textColor = "text-zinc-400"
@@ -608,7 +599,7 @@ function StatusBadge({ status, isAuction }: { status: string, isAuction: boolean
 
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${bgColor} ${textColor}`}>
-      {status === "pending" && <AlertTriangle className="mr-1 h-3 w-3" />}
+      {status === "draft" && <AlertTriangle className="mr-1 h-3 w-3" />}
       {label}
     </span>
   )
