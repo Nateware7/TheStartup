@@ -729,7 +729,7 @@ export function MessageCenter() {
                           )}
                           <div className={`max-w-[70%] rounded-lg py-2 px-4 ${
                             isCurrentUser 
-                              ? 'bg-blue-600 text-white rounded-br-none' 
+                              ? 'bg-purple-800 text-white rounded-br-none' 
                               : 'bg-zinc-800 text-zinc-100 rounded-bl-none'
                           }`}>
                             <p className="break-words whitespace-normal overflow-hidden">
@@ -738,7 +738,7 @@ export function MessageCenter() {
                                 <span className="ml-1 text-xs opacity-70">🔒</span>
                               )}
                             </p>
-                            <div className={`text-xs mt-1 ${isCurrentUser ? 'text-blue-200' : 'text-zinc-400'}`}>
+                            <div className={`text-xs mt-1 ${isCurrentUser ? 'text-purple-200' : 'text-zinc-400'}`}>
                               {message.createdAt ? 
                                 new Date(message.createdAt.toDate()).toLocaleTimeString('en-US', {
                                   hour: '2-digit',
@@ -783,7 +783,7 @@ export function MessageCenter() {
                     />
                     <Button 
                       onClick={handleSendMessage}
-                      className="absolute right-1 top-1/2 transform -translate-y-1/2 bg-blue-600 hover:bg-blue-700 h-8 w-8 p-0"
+                      className="absolute right-1 top-1/2 transform -translate-y-1/2 bg-purple-700 hover:bg-purple-800 h-8 w-8 p-0"
                       disabled={!newMessage.trim()}
                       type="submit"
                       size="sm"
