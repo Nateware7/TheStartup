@@ -91,6 +91,17 @@ export default function ProductPage() {
         if (docSnap.exists()) {
           const data = docSnap.data();
           
+          // Check if transaction is complete but status is not updated
+          if (data.isComplete && 
+              data.confirmation?.sellerConfirmed === true && 
+              data.confirmation?.winnerConfirmed === true && 
+              data.status !== "sold") {
+            // Update status to "sold"
+            await updateDoc(docRef, { status: "sold" });
+            console.log(`Updated listing ${productId} status to sold`);
+            data.status = "sold";
+          }
+          
           // Get seller information
           let sellerInfo = {
             id: data.sellerId || "",

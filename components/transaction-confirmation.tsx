@@ -81,40 +81,54 @@ export function TransactionConfirmation({
       <div className="flex flex-col">
         <h3 className="text-lg font-semibold text-white mb-2">Transaction Confirmation</h3>
         
-        <p className="text-sm text-zinc-400 mb-4">
-          {userRole === 'seller'
-            ? "Please confirm that you've completed this transaction with the buyer."
-            : "Please confirm that you've completed this transaction with the seller."}
-        </p>
-        
-        {hasConfirmed ? (
-          <div className="flex items-center gap-2 text-emerald-400">
-            <CheckCircle className="h-5 w-5" />
-            <span className="text-sm font-medium">
-              You have confirmed this transaction
-            </span>
+        {confirmation.sellerConfirmed && confirmation.winnerConfirmed ? (
+          <div className="text-center py-2">
+            <div className="flex items-center justify-center gap-2 text-emerald-400 mb-2">
+              <CheckCircle className="h-6 w-6" />
+              <span className="text-base font-medium">Transaction Complete</span>
+            </div>
+            <p className="text-sm text-zinc-400">
+              Both parties have confirmed this transaction. The item has been marked as sold.
+            </p>
           </div>
         ) : (
-          <Button
-            onClick={handleConfirm}
-            disabled={isLoading}
-            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-medium"
-            variant="default"
-          >
-            {isLoading ? "Confirming..." : "Confirm Transaction"}
-          </Button>
-        )}
-        
-        {(userRole === 'seller' && confirmation.winnerConfirmed) && (
-          <div className="mt-2 text-xs text-emerald-400/80">
-            The buyer has already confirmed this transaction.
-          </div>
-        )}
-        
-        {(userRole === 'winner' && confirmation.sellerConfirmed) && (
-          <div className="mt-2 text-xs text-emerald-400/80">
-            The seller has already confirmed this transaction.
-          </div>
+          <>
+            <p className="text-sm text-zinc-400 mb-4">
+              {userRole === 'seller'
+                ? "Please confirm that you've completed this transaction with the buyer."
+                : "Please confirm that you've completed this transaction with the seller."}
+            </p>
+            
+            {hasConfirmed ? (
+              <div className="flex items-center gap-2 text-emerald-400">
+                <CheckCircle className="h-5 w-5" />
+                <span className="text-sm font-medium">
+                  You have confirmed this transaction
+                </span>
+              </div>
+            ) : (
+              <Button
+                onClick={handleConfirm}
+                disabled={isLoading}
+                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-medium"
+                variant="default"
+              >
+                {isLoading ? "Confirming..." : "Confirm Transaction"}
+              </Button>
+            )}
+            
+            {(userRole === 'seller' && confirmation.winnerConfirmed) && (
+              <div className="mt-2 text-xs text-emerald-400/80">
+                The buyer has already confirmed this transaction.
+              </div>
+            )}
+            
+            {(userRole === 'winner' && confirmation.sellerConfirmed) && (
+              <div className="mt-2 text-xs text-emerald-400/80">
+                The seller has already confirmed this transaction.
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

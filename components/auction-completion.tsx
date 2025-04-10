@@ -5,7 +5,7 @@ import { TransactionConfirmation } from "@/components/transaction-confirmation";
 import { RatingModal } from "@/components/rating-modal";
 import { useAuth } from "@/hooks/use-auth";
 import { isTransactionComplete, checkAndUpdateAuctionStatus } from "@/lib/auction";
-import { doc, getDoc, onSnapshot, Timestamp } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, Timestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 import { Trophy, Tag } from "lucide-react";
 import { MessageButton } from "@/components/message-button";
@@ -85,6 +85,13 @@ export function AuctionCompletion({ listingId }: AuctionCompletionProps) {
         
         // If transaction is complete and user is involved (seller or winner)
         if (complete && (user.uid === listing.sellerId || user.uid === listing.winnerId)) {
+          // Check if the status is not "sold" yet
+          if (listing.status !== "sold") {
+            const listingRef = doc(db, "listings", listingId);
+            await updateDoc(listingRef, { status: "sold" });
+            console.log(`Listing ${listingId} has been marked as sold`);
+          }
+          
           // Check if listing has already been rated
           if (!listing.hasBeenRated) {
             // Determine who the user should rate (the other party)
@@ -114,26 +121,35 @@ export function AuctionCompletion({ listingId }: AuctionCompletionProps) {
     <>
       {/* Auction Winner Banner */}
       {listing.isComplete && listing.winnerId && (
-        <div className="my-4 rounded-xl border border-amber-800/40 bg-amber-900/30 p-5 backdrop-blur-sm shadow-lg">
+        <div className={`my-4 rounded-xl border ${listing.status === "sold" ? "border-emerald-800/40 bg-emerald-900/30" : "border-amber-800/40 bg-amber-900/30"} p-5 backdrop-blur-sm shadow-lg`}>
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="rounded-full bg-amber-600/30 p-2">
-                <Trophy className="h-6 w-6 text-amber-400" />
+              <div className={`rounded-full ${listing.status === "sold" ? "bg-emerald-600/30" : "bg-amber-600/30"} p-2`}>
+                <Trophy className={`h-6 w-6 ${listing.status === "sold" ? "text-emerald-400" : "text-amber-400"}`} />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-amber-300">Auction Complete</h3>
+                <h3 className={`text-lg font-semibold ${listing.status === "sold" ? "text-emerald-300" : "text-amber-300"}`}>
+                  {listing.status === "sold" ? "Item Sold" : "Auction Complete"}
+                </h3>
                 {winnerInfo ? (
                   <div className="space-y-1">
-                    <p className="text-sm text-amber-200/80">
+                    <p className={`text-sm ${listing.status === "sold" ? "text-emerald-200/80" : "text-amber-200/80"}`}>
                       Winner: <span className="font-medium">{winnerInfo.username}</span> ({winnerInfo.handle})
                     </p>
-                    <p className="text-sm text-amber-200/80">
+                    <p className={`text-sm ${listing.status === "sold" ? "text-emerald-200/80" : "text-amber-200/80"}`}>
                       Final Price: <span className="font-medium">${listing.currentBid?.toFixed(2) || "0.00"}</span>
                     </p>
+                    {listing.status === "sold" && (
+                      <p className="text-sm text-emerald-200/80">
+                        <span className="font-medium">Transaction complete</span> - Both parties have confirmed
+                      </p>
+                    )}
                   </div>
                 ) : (
-                  <p className="text-sm text-amber-200/80">
-                    A winner has been determined for this auction.
+                  <p className={`text-sm ${listing.status === "sold" ? "text-emerald-200/80" : "text-amber-200/80"}`}>
+                    {listing.status === "sold" 
+                      ? "This item has been sold and the transaction is complete."
+                      : "A winner has been determined for this auction."}
                   </p>
                 )}
               </div>

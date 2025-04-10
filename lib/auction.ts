@@ -189,6 +189,18 @@ export async function confirmTransaction(
       [`confirmation.${confirmationField}`]: true
     });
     
+    // Check if both parties have now confirmed the transaction
+    const otherRole = role === 'seller' ? 'winnerConfirmed' : 'sellerConfirmed';
+    const otherConfirmed = listingData.confirmation?.[otherRole] === true;
+    
+    // If both have confirmed, update status to "sold"
+    if (otherConfirmed) {
+      await updateDoc(listingRef, {
+        status: "sold"
+      });
+      console.log(`Listing ${listingId} has been marked as sold`);
+    }
+    
     return true;
   } catch (error) {
     console.error("Error confirming transaction:", error);
@@ -212,10 +224,13 @@ export async function isTransactionComplete(listingId: string): Promise<boolean>
     
     const listingData = listingDoc.data();
     
-    return (
+    // Check if both parties have confirmed
+    const isComplete = (
       listingData.confirmation?.sellerConfirmed === true && 
       listingData.confirmation?.winnerConfirmed === true
     );
+    
+    return isComplete;
   } catch (error) {
     console.error("Error checking transaction status:", error);
     return false;
