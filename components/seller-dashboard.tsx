@@ -175,6 +175,14 @@ export function SellerDashboard() {
 
           querySnapshot.forEach((doc) => {
             const data = doc.data()
+            console.log("Listing data:", data)
+            
+            // More robust check for auction status
+            // An item is an auction if:
+            // 1. It has isAuction = true explicitly, OR
+            // 2. It has a currentBid value and the flag is missing
+            const isAuction = data.isAuction === true || (data.isAuction !== false && data.currentBid !== undefined);
+            
             const listing: Listing = {
               id: doc.id,
               title: data.title || "Untitled Listing",
@@ -183,7 +191,7 @@ export function SellerDashboard() {
               platform: data.platform || "",
               assetType: data.assetType || "username",
               price: data.price || 0,
-              isAuction: data.isAuction !== undefined ? data.isAuction : !!data.currentBid,
+              isAuction: isAuction,
               currentBid: data.currentBid,
               status: data.status || "draft",
               image: data.image || "/placeholder.svg?height=100&width=100",
@@ -197,7 +205,23 @@ export function SellerDashboard() {
             if (listing.status === "active") activeCount++
             else if (listing.status === "sold") {
               soldCount++
-              totalRev += parseFloat(listing.price.toString() || "0")
+              console.log("Found sold item:", listing.title)
+              console.log("isAuction:", isAuction, "currentBid:", data.currentBid, "price:", data.price)
+              
+              // Calculate revenue based on the type of listing
+              let revenue = 0;
+              
+              // If it has a currentBid and it's an auction, use that value
+              if (isAuction && data.currentBid !== undefined) {
+                revenue = parseFloat(data.currentBid.toString() || "0");
+                console.log(`Using auction bid amount: ${revenue}`);
+              } else {
+                revenue = parseFloat(data.price?.toString() || "0");
+                console.log(`Using regular price amount: ${revenue}`);
+              }
+              
+              totalRev += revenue;
+              console.log("Running total revenue:", totalRev)
             }
             else if (listing.status === "draft") draftCount++
           })
