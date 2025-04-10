@@ -7,6 +7,7 @@ import { Toaster } from "@/components/toaster"
 import { Navbar } from "@/components/navbar"
 import { EnhancedFooter } from "@/components/enhanced-footer"
 import { AnimatedBackground } from "@/components/animated-background"
+import { AuthProvider } from "@/hooks/use-auth"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -44,14 +45,16 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AnimatedBackground>
-            <div className="flex min-h-screen flex-col">
-              <Navbar />
-              {children}
-              <EnhancedFooter />
-            </div>
-          </AnimatedBackground>
-          <Toaster />
+          <AuthProvider>
+            <AnimatedBackground>
+              <div className="flex min-h-screen flex-col">
+                <Navbar />
+                {children}
+                <EnhancedFooter />
+              </div>
+            </AnimatedBackground>
+            <Toaster />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

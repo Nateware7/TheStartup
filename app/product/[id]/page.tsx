@@ -7,12 +7,18 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AnimatedBackground } from "@/components/animated-background"
 import { AuctionLog } from "@/components/auction-log"
 import { MessageButton } from "@/components/message-button"
-import { ProductTimer } from "@/components/product-timer"
+import { ProductTimer, isTimerExpired } from "@/components/product-timer"
 import { useState, useEffect } from "react"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { db, auth } from "@/lib/firebaseConfig"
 import { usePathname } from "next/navigation"
 import { format } from "date-fns"
+import { AuctionCompletion } from "@/components/auction-completion"
+import { checkAndUpdateAuctionStatus } from "@/lib/auction"
+import { toast } from "sonner"
+import { AuctionTimer } from "@/components/auction-timer"
+import { StarRating } from "@/components/star-rating"
+import { RateSellerButton } from "@/components/rate-seller-button"
 
 // NOTE: This component directly accesses params.id which will show warnings in the console
 // In a future version of Next.js, params will need to be unwrapped with React.use()
@@ -47,6 +53,15 @@ interface Product {
   status: "active" | "sold";
   bid?: number;
   auctionLog?: Array<{ username: string; amount: number; timestamp: string; isLeading?: boolean }>;
+  isComplete: boolean;
+  sellerId?: string;
+  winnerId?: string | null;
+  highestBidderId?: string;
+  confirmation?: {
+    sellerConfirmed: boolean;
+    winnerConfirmed: boolean;
+  };
+  hasBeenRated?: boolean;
 }
 
 export default function ProductPage() {
@@ -55,6 +70,7 @@ export default function ProductPage() {
   const [bidAmount, setBidAmount] = useState<number | "">("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [auctionExpired, setAuctionExpired] = useState(false);
   
   // Get the product ID from the pathname instead of params
   const pathname = usePathname();
@@ -93,6 +109,20 @@ export default function ProductPage() {
               const sellerDoc = await getDoc(doc(db, "users", data.sellerId));
               if (sellerDoc.exists()) {
                 const sellerData = sellerDoc.data();
+                
+                // Get the seller's rating from userRatings collection if available
+                let sellerRating = sellerData.rating || 0;
+                try {
+                  const sellerRatingDoc = await getDoc(doc(db, "userRatings", data.sellerId));
+                  if (sellerRatingDoc.exists()) {
+                    const ratingData = sellerRatingDoc.data();
+                    sellerRating = ratingData.rating || sellerRating;
+                  }
+                } catch (ratingErr) {
+                  console.error("Error fetching seller rating:", ratingErr);
+                  // Continue with the original rating if there's an error
+                }
+                
                 sellerInfo = {
                   id: data.sellerId,
                   name: sellerData.username || sellerData.displayName || "Anonymous",
@@ -101,7 +131,7 @@ export default function ProductPage() {
                   verified: sellerData.isVerified || false,
                   joinDate: sellerData.createdAt ? format(sellerData.createdAt.toDate(), 'MMMM yyyy') : "Unknown",
                   sales: sellerData.sales || 0,
-                  rating: sellerData.rating || 0,
+                  rating: sellerRating,
                 };
               }
             } catch (error) {
@@ -129,6 +159,12 @@ export default function ProductPage() {
             status: data.status || "active",
             bid: data.bid,
             auctionLog: data.auctionLog || [],
+            isComplete: data.isComplete || false,
+            sellerId: data.sellerId,
+            winnerId: data.winnerId,
+            highestBidderId: data.highestBidderId,
+            confirmation: data.confirmation || { sellerConfirmed: false, winnerConfirmed: false },
+            hasBeenRated: data.hasBeenRated || false,
           });
         } else {
           setProduct(null);
@@ -155,11 +191,56 @@ export default function ProductPage() {
       setError("Bid must be higher than the current bid.");
       return;
     }
+    
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      setError("You must be logged in to place a bid.");
+      return;
+    }
 
     try {
+      // Get the user's username from Firestore
+      let username = "Anonymous";
+      try {
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          username = userData.username || "Anonymous";
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+
       const productRef = doc(db, "listings", product.id);
-      await updateDoc(productRef, { currentBid: bidAmount });
-      setProduct((prev) => prev && { ...prev, currentBid: bidAmount });
+      await updateDoc(productRef, { 
+        currentBid: bidAmount,
+        highestBidderId: currentUser.uid,
+        // Add to auction log
+        auctionLog: [
+          {
+            username: username,
+            amount: bidAmount,
+            timestamp: new Date().toISOString(),
+            isLeading: true
+          },
+          ...(product.auctionLog || []).map(log => ({...log, isLeading: false}))
+        ]
+      });
+      
+      setProduct((prev) => prev && { 
+        ...prev, 
+        currentBid: bidAmount,
+        auctionLog: [
+          {
+            username: username,
+            amount: bidAmount,
+            timestamp: "Just now",
+            isLeading: true
+          },
+          ...(prev.auctionLog || []).map(log => ({...log, isLeading: false}))
+        ]
+      });
+      
       setSuccess("Bid placed successfully!");
       setError(null);
     } catch (err) {
@@ -277,6 +358,28 @@ export default function ProductPage() {
       .toUpperCase();
   };
 
+  // Update the remaining time state on expiration
+  const handleTimerExpired = () => {
+    setAuctionExpired(true);
+  };
+
+  // Check if the auction timer has expired
+  const isExpired = product?.expiresAt ? isTimerExpired(product.expiresAt) : false;
+
+  // Handle auction status changes
+  const handleAuctionStatusChange = (isComplete: boolean) => {
+    if (isComplete) {
+      setProduct(prevProduct => {
+        if (!prevProduct) return null;
+        return {
+          ...prevProduct,
+          isComplete: true,
+          winnerId: prevProduct.highestBidderId || null
+        };
+      });
+    }
+  };
+
   return (
     <AnimatedBackground>
       <div className="min-h-screen text-white">
@@ -358,6 +461,11 @@ export default function ProductPage() {
                     <AuctionLog auctionLog={product.auctionLog} />
                   </div>
                 )}
+
+                {/* Add AuctionCompletion component */}
+                {product.isComplete && (
+                  <AuctionCompletion listingId={product.id} />
+                )}
               </div>
 
               {/* Right sidebar */}
@@ -386,34 +494,34 @@ export default function ProductPage() {
 
                   {isAuction ? (
                     <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          placeholder="Enter bid amount"
-                          className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-white placeholder:text-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                          value={bidAmount}
-                          onChange={(e) => setBidAmount(parseFloat(e.target.value) || "")}
-                          step="0.01"
-                          min={(typeof product.currentBid === 'number' ? product.currentBid + 0.01 : 0.01).toFixed(2)}
-                        />
-                        <button
-                          onClick={handleBid}
-                          className="rounded-md bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 font-medium text-white hover:from-emerald-600 hover:to-teal-600"
-                        >
-                          Bid
-                        </button>
-                      </div>
+                      {!product.isComplete && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            placeholder="Enter bid amount"
+                            className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-white placeholder:text-zinc-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            value={bidAmount}
+                            onChange={(e) => setBidAmount(parseFloat(e.target.value) || "")}
+                            step="0.01"
+                            min={(typeof product.currentBid === 'number' ? product.currentBid + 0.01 : 0.01).toFixed(2)}
+                          />
+                          <button
+                            onClick={handleBid}
+                            className="rounded-md bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 font-medium text-white hover:from-emerald-600 hover:to-teal-600"
+                          >
+                            Bid
+                          </button>
+                        </div>
+                      )}
                       {error && <div className="text-red-500 text-sm">{error}</div>}
                       {success && <div className="text-green-500 text-sm">{success}</div>}
                       <div className="text-sm text-zinc-500">
-                        Auction <ProductTimer 
+                        Auction <AuctionTimer 
                           expiresAt={product.expiresAt}
-                          durationString={product.durationString}
-                          durationDays={product.durationDays}
-                          durationHours={product.durationHours}
-                          durationMinutes={product.durationMinutes}
+                          listingId={product.id}
+                          isComplete={product.isComplete}
                           className="text-white font-medium"
-                          prefix=""
+                          onStatusChange={handleAuctionStatusChange}
                         />
                       </div>
                     </div>
@@ -436,9 +544,11 @@ export default function ProductPage() {
                       <span className="text-zinc-500">Sales:</span>
                       <span className="text-zinc-300">{product.seller.sales} products</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-zinc-500">Rating:</span>
-                      <span className="text-zinc-300">{product.seller.rating}/5.0</span>
+                      <div className="flex items-center gap-1">
+                        <StarRating rating={product.seller.rating} maxRating={5} size="sm" showValue={true} />
+                      </div>
                     </div>
                   </div>
                   <div className="mt-4 grid grid-cols-1 gap-2">
@@ -448,12 +558,66 @@ export default function ProductPage() {
                       </button>
                     </Link>
                     {auth.currentUser?.uid !== product.seller.id && (
-                      <MessageButton
-                        recipientId={product.seller.id}
-                        recipientName={product.seller.name}
-                        variant="outline"
-                        className="w-full border-zinc-700 text-white hover:bg-zinc-700"
-                      />
+                      <>
+                        <MessageButton
+                          recipientId={product.seller.id}
+                          recipientName={product.seller.name}
+                          variant="outline"
+                          className="w-full border-zinc-700 text-white hover:bg-zinc-700"
+                        />
+                        {/* For auctions, only show rating button if auction is complete.
+                            For direct purchases, always show the rating option. */}
+                        {(isAuction ? product.isComplete : true) && (
+                          <RateSellerButton 
+                            sellerId={product.seller.id}
+                            listingId={product.id}
+                            className="w-full border-zinc-700 text-white hover:bg-zinc-700"
+                            hasBeenRated={product.hasBeenRated}
+                            onRatingSubmitted={(newRating) => {
+                              // Mark the product as rated
+                              setProduct(prev => {
+                                if (!prev) return null;
+                                return { ...prev, hasBeenRated: true };
+                              });
+                              
+                              // Update the listing in Firestore
+                              updateDoc(doc(db, "listings", product.id), {
+                                hasBeenRated: true
+                              }).catch((error) => {
+                                console.error("Error updating hasBeenRated:", error);
+                              });
+                              
+                              // Fetch the updated rating from userRatings collection after a short delay
+                              // to give time for the rating to be calculated and stored
+                              setTimeout(async () => {
+                                try {
+                                  const ratingDoc = await getDoc(doc(db, "userRatings", product.seller.id));
+                                  if (ratingDoc.exists()) {
+                                    const ratingData = ratingDoc.data();
+                                    
+                                    // Update the product state with the new rating
+                                    setProduct(prev => {
+                                      if (!prev) return null;
+                                      
+                                      const updatedSeller = {
+                                        ...prev.seller,
+                                        rating: ratingData.rating || prev.seller.rating
+                                      };
+                                      
+                                      return {
+                                        ...prev,
+                                        seller: updatedSeller
+                                      };
+                                    });
+                                  }
+                                } catch (error) {
+                                  console.error("Error fetching updated rating:", error);
+                                }
+                              }, 1500); // Wait 1.5 seconds before checking for the updated rating
+                            }}
+                          />
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

@@ -9,6 +9,7 @@ import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { UserProducts } from "@/components/user-products"
+import { UserReviews } from "@/components/user-reviews"
 import { AnimatedBackground } from "@/components/animated-background"
 import { MessageButton } from "@/components/message-button"
 import { db, auth } from "@/lib/firebaseConfig"
@@ -76,6 +77,19 @@ function UserProfileContent({ userId }: { userId: string }) {
           // Format creation date
           const createdAt = userData.createdAt?.toDate() || new Date()
           
+          // Get the user's rating from userRatings collection if available
+          let userRating = userData.rating || 0
+          try {
+            const userRatingDoc = await getDoc(doc(db, 'userRatings', userId))
+            if (userRatingDoc.exists()) {
+              const ratingData = userRatingDoc.data()
+              userRating = ratingData.rating || userRating
+            }
+          } catch (ratingErr) {
+            console.error("Error fetching user rating:", ratingErr)
+            // Continue with the original rating if there's an error
+          }
+          
           setUser({
             id: userDoc.id,
             username: userData.username || "Anonymous",
@@ -88,7 +102,7 @@ function UserProfileContent({ userId }: { userId: string }) {
             sales: userData.sales || 0,
             followers: userData.followers || 0,
             following: userData.following || 0,
-            rating: userData.rating || 0,
+            rating: userRating,
             badges: formattedBadges.length ? formattedBadges : [
               { name: "New Member", icon: Calendar }
             ]
@@ -118,6 +132,19 @@ function UserProfileContent({ userId }: { userId: string }) {
             // Format creation date
             const createdAt = userData.createdAt?.toDate() || new Date()
             
+            // Get the user's rating from userRatings collection if available
+            let userRating = userData.rating || 0
+            try {
+              const userRatingDoc = await getDoc(doc(db, 'userRatings', querySnapshot.docs[0].id))
+              if (userRatingDoc.exists()) {
+                const ratingData = userRatingDoc.data()
+                userRating = ratingData.rating || userRating
+              }
+            } catch (ratingErr) {
+              console.error("Error fetching user rating:", ratingErr)
+              // Continue with the original rating if there's an error
+            }
+            
             setUser({
               id: querySnapshot.docs[0].id,
               username: userData.username || "Anonymous",
@@ -130,7 +157,7 @@ function UserProfileContent({ userId }: { userId: string }) {
               sales: userData.sales || 0,
               followers: userData.followers || 0,
               following: userData.following || 0,
-              rating: userData.rating || 0,
+              rating: userRating,
               badges: formattedBadges.length ? formattedBadges : [
                 { name: "New Member", icon: Calendar }
               ]
@@ -322,10 +349,7 @@ function UserProfileContent({ userId }: { userId: string }) {
                   )}
                   
                   {activeTab === "reviews" && (
-                    <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center backdrop-blur-sm">
-                      <h3 className="text-lg font-medium">No Reviews Yet</h3>
-                      <p className="mt-2 text-zinc-400">This user hasn't received any reviews yet.</p>
-                    </div>
+                    <UserReviews userId={user.id} />
                   )}
                 </div>
               </div>

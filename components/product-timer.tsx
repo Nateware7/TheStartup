@@ -11,6 +11,36 @@ interface ProductTimerProps {
   className?: string;
   prefix?: string; // Optional prefix like "Ends: " or "Auction ends in"
   isAuction?: boolean; // Optional flag to style differently based on auction status
+  onExpired?: () => void; // Callback function to trigger when auction expires
+}
+
+// Static helper function to check if a timer is expired
+export function isTimerExpired(expiresAt?: any): boolean {
+  if (!expiresAt) return false;
+  
+  try {
+    // Handle various timestamp formats
+    let expirationDate;
+    if (expiresAt?.toDate) {
+      // Firestore Timestamp
+      expirationDate = expiresAt.toDate();
+    } else if (expiresAt?._seconds) {
+      // Firestore serialized timestamp
+      expirationDate = new Date(expiresAt._seconds * 1000);
+    } else if (expiresAt?.seconds) {
+      // Another common Firestore timestamp format
+      expirationDate = new Date(expiresAt.seconds * 1000);
+    } else {
+      // Try as regular date string/object
+      expirationDate = new Date(expiresAt);
+    }
+    
+    const now = new Date();
+    return expirationDate.getTime() <= now.getTime();
+  } catch (error) {
+    console.error("Error checking if timer is expired:", error);
+    return false;
+  }
 }
 
 export function ProductTimer({
@@ -21,9 +51,11 @@ export function ProductTimer({
   durationMinutes,
   className = "",
   prefix = "",
-  isAuction = false
+  isAuction = false,
+  onExpired
 }: ProductTimerProps) {
   const [remainingTime, setRemainingTime] = useState<string>("");
+  const [isExpired, setIsExpired] = useState(false);
 
   useEffect(() => {
     console.log("ProductTimer props:", { 
@@ -97,23 +129,34 @@ export function ProductTimer({
         
         // If expired
         if (diffMs <= 0) {
-          setRemainingTime("Expired");
+          if (!isExpired) {
+            setIsExpired(true);
+            setRemainingTime("Expired");
+            
+            // Call the onExpired callback if provided
+            if (onExpired) {
+              onExpired();
+            }
+          }
           return;
         }
         
         const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
         const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
         
-        console.log("Time components:", { days, hours, minutes });
+        console.log("Time components:", { days, hours, minutes, seconds });
         
         // Format time based on components
         if (days > 0) {
           setRemainingTime(`${days}d ${hours}h ${minutes}m`);
         } else if (hours > 0) {
-          setRemainingTime(`${hours}h ${minutes}m`);
+          setRemainingTime(`${hours}h ${minutes}m ${seconds}s`);
+        } else if (minutes > 0) {
+          setRemainingTime(`${minutes}m ${seconds}s`);
         } else {
-          setRemainingTime(`${minutes}m`);
+          setRemainingTime(`${seconds}s`);
         }
       } catch (error) {
         console.error("Error calculating time:", error);
@@ -142,11 +185,11 @@ export function ProductTimer({
     // Initial calculation
     calculateRemainingTime();
     
-    // Update every minute
-    const interval = setInterval(calculateRemainingTime, 60000);
+    // Update more frequently (every second) for more responsive UI
+    const interval = setInterval(calculateRemainingTime, 1000);
     
     return () => clearInterval(interval);
-  }, [expiresAt, durationString, durationDays, durationHours, durationMinutes]);
+  }, [expiresAt, durationString, durationDays, durationHours, durationMinutes, onExpired, isExpired]);
 
   // If there's no time data yet, show a loading state
   if (!remainingTime) {
@@ -155,7 +198,7 @@ export function ProductTimer({
 
   // Return the formatted time
   return (
-    <span className={`${className} ${isAuction ? "text-emerald-400" : ""}`}>
+    <span className={`${className} ${isAuction ? "text-emerald-400" : ""} ${isExpired ? "text-red-400" : ""}`}>
       {remainingTime === "Expired" 
         ? remainingTime 
         : `${prefix}${remainingTime}`}
