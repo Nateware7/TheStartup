@@ -26,6 +26,11 @@ type Product = {
   assetType?: string
   status?: string
   isAuction?: boolean
+  expiresAt?: any
+  durationDays?: number
+  durationHours?: number
+  durationMinutes?: number
+  durationString?: string
   seller?: {
     id: string
     name: string
@@ -76,7 +81,12 @@ export function UserProducts({ userId }: UserProductsProps) {
             sellerId: userId,
             assetType: data.assetType || "username",
             status: data.status || "active",
-            isAuction: data.isAuction || false
+            isAuction: data.isAuction || false,
+            expiresAt: data.expiresAt,
+            durationDays: data.durationDays,
+            durationHours: data.durationHours,
+            durationMinutes: data.durationMinutes,
+            durationString: data.durationString
           })
         })
         

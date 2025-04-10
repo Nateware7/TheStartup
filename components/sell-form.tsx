@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, ChangeEvent, FormEvent } from "react"
 import { motion } from "framer-motion"
 import { AlertCircle, Upload, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -12,10 +12,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useToast } from "@/hooks/use-toast"
 
+interface FormData {
+  assetType: string;
+  platform: string;
+  username: string;
+  shortDescription: string;
+  fullDescription: string;
+  price: string;
+  startingBid: string;
+  bidIncrement: string;
+  maxBid: string;
+  duration: string;
+  durationDays: string;
+  durationHours: string;
+  durationMinutes: string;
+  ownershipConfirmed: boolean;
+}
+
+interface FormErrors {
+  assetType?: string;
+  platform?: string;
+  username?: string;
+  shortDescription?: string;
+  price?: string;
+  startingBid?: string;
+  bidIncrement?: string;
+  duration?: string;
+  ownershipConfirmed?: string;
+}
+
 export function SellForm() {
   const { toast } = useToast()
   const [isAuction, setIsAuction] = useState(false)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     assetType: "",
     platform: "",
     username: "",
@@ -26,34 +55,47 @@ export function SellForm() {
     bidIncrement: "",
     maxBid: "",
     duration: "",
+    durationDays: "0",
+    durationHours: "0",
+    durationMinutes: "0",
     ownershipConfirmed: false,
   })
-  const [formErrors, setFormErrors] = useState({})
+  const [formErrors, setFormErrors] = useState<FormErrors>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type, checked } = e.target as HTMLInputElement;
     setFormData({
       ...formData,
       [name]: type === "checkbox" ? checked : value,
     })
   }
 
-  const handleSelectChange = (name, value) => {
+  const handleSelectChange = (name: string, value: string) => {
     setFormData({
       ...formData,
       [name]: value,
     })
   }
 
-  const validateForm = () => {
-    const errors = {}
+  const validateForm = (): FormErrors => {
+    const errors: FormErrors = {}
 
     // Required fields for all submissions
     if (!formData.assetType) errors.assetType = "Asset type is required"
     if (!formData.platform) errors.platform = "Platform is required"
     if (!formData.username) errors.username = "Username is required"
     if (!formData.shortDescription) errors.shortDescription = "Short description is required"
+    
+    // Duration validation
+    const days = parseInt(formData.durationDays) || 0
+    const hours = parseInt(formData.durationHours) || 0
+    const minutes = parseInt(formData.durationMinutes) || 0
+    const totalMinutes = (days * 24 * 60) + (hours * 60) + minutes
+    
+    if (totalMinutes <= 0) {
+      errors.duration = "Duration must be greater than zero"
+    }
 
     // Price validation
     if (!isAuction && (!formData.price || Number.parseFloat(formData.price) <= 0)) {
@@ -68,7 +110,6 @@ export function SellForm() {
       if (!formData.bidIncrement || Number.parseFloat(formData.bidIncrement) <= 0) {
         errors.bidIncrement = "Valid bid increment is required"
       }
-      if (!formData.duration) errors.duration = "Duration is required"
     }
 
     // Ownership confirmation
@@ -79,7 +120,7 @@ export function SellForm() {
     return errors
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
 
     const errors = validateForm()
@@ -134,7 +175,7 @@ export function SellForm() {
                       <SelectTrigger
                         id="assetType"
                         className={`w-full border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500 ${
-                          formErrors.assetType ? "border-red-500" : ""
+                          formErrors?.assetType ? "border-red-500" : ""
                         }`}
                       >
                         <SelectValue placeholder="Select asset type" />
@@ -144,7 +185,7 @@ export function SellForm() {
                         <SelectItem value="account">Account</SelectItem>
                       </SelectContent>
                     </Select>
-                    {formErrors.assetType && <p className="text-xs text-red-500">{formErrors.assetType}</p>}
+                    {formErrors?.assetType && <p className="text-xs text-red-500">{formErrors.assetType}</p>}
                   </div>
 
                   {/* Platform */}
@@ -159,7 +200,7 @@ export function SellForm() {
                       <SelectTrigger
                         id="platform"
                         className={`w-full border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500 ${
-                          formErrors.platform ? "border-red-500" : ""
+                          formErrors?.platform ? "border-red-500" : ""
                         }`}
                       >
                         <SelectValue placeholder="Select platform" />
@@ -173,7 +214,7 @@ export function SellForm() {
                         <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>
-                    {formErrors.platform && <p className="text-xs text-red-500">{formErrors.platform}</p>}
+                    {formErrors?.platform && <p className="text-xs text-red-500">{formErrors.platform}</p>}
                   </div>
 
                   {/* Username */}
@@ -189,12 +230,12 @@ export function SellForm() {
                         value={formData.username}
                         onChange={handleInputChange}
                         className={`pl-8 border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500 ${
-                          formErrors.username ? "border-red-500" : ""
+                          formErrors?.username ? "border-red-500" : ""
                         }`}
                         placeholder="username"
                       />
                     </div>
-                    {formErrors.username && <p className="text-xs text-red-500">{formErrors.username}</p>}
+                    {formErrors?.username && <p className="text-xs text-red-500">{formErrors.username}</p>}
                   </div>
 
                   {/* Short Description */}
@@ -212,11 +253,11 @@ export function SellForm() {
                       onChange={handleInputChange}
                       maxLength={100}
                       className={`border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500 ${
-                        formErrors.shortDescription ? "border-red-500" : ""
+                        formErrors?.shortDescription ? "border-red-500" : ""
                       }`}
                       placeholder="Brief description shown in listing card"
                     />
-                    {formErrors.shortDescription && (
+                    {formErrors?.shortDescription && (
                       <p className="text-xs text-red-500">{formErrors.shortDescription}</p>
                     )}
                   </div>
@@ -275,27 +316,83 @@ export function SellForm() {
 
                   {/* Fixed Price Fields */}
                   {!isAuction && (
-                    <div className="space-y-2">
-                      <Label htmlFor="price">
-                        Price <span className="text-red-500">*</span>
-                      </Label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">$</span>
-                        <Input
-                          id="price"
-                          name="price"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.price}
-                          onChange={handleInputChange}
-                          className={`pl-8 border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500 ${
-                            formErrors.price ? "border-red-500" : ""
-                          }`}
-                          placeholder="0.00"
-                        />
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="price">
+                          Price <span className="text-red-500">*</span>
+                        </Label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">$</span>
+                          <Input
+                            id="price"
+                            name="price"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={formData.price}
+                            onChange={handleInputChange}
+                            className={`pl-8 border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500 ${
+                              formErrors?.price ? "border-red-500" : ""
+                            }`}
+                            placeholder="0.00"
+                          />
+                        </div>
+                        {formErrors?.price && <p className="text-xs text-red-500">{formErrors.price}</p>}
                       </div>
-                      {formErrors.price && <p className="text-xs text-red-500">{formErrors.price}</p>}
+
+                      {/* Duration */}
+                      <div className="space-y-2">
+                        <Label htmlFor="duration">
+                          Listing Duration <span className="text-red-500">*</span>
+                        </Label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="durationDays"
+                                name="durationDays"
+                                type="number"
+                                min="0"
+                                value={formData.durationDays}
+                                onChange={handleInputChange}
+                                className="border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500"
+                              />
+                              <Label htmlFor="durationDays" className="whitespace-nowrap">Days</Label>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="durationHours"
+                                name="durationHours"
+                                type="number"
+                                min="0"
+                                max="23"
+                                value={formData.durationHours}
+                                onChange={handleInputChange}
+                                className="border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500"
+                              />
+                              <Label htmlFor="durationHours" className="whitespace-nowrap">Hours</Label>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="durationMinutes"
+                                name="durationMinutes"
+                                type="number"
+                                min="0"
+                                max="59"
+                                value={formData.durationMinutes}
+                                onChange={handleInputChange}
+                                className="border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500"
+                              />
+                              <Label htmlFor="durationMinutes" className="whitespace-nowrap">Minutes</Label>
+                            </div>
+                          </div>
+                        </div>
+                        {formErrors?.duration && <p className="text-xs text-red-500">{formErrors.duration}</p>}
+                      </div>
                     </div>
                   )}
 
@@ -317,12 +414,12 @@ export function SellForm() {
                             value={formData.startingBid}
                             onChange={handleInputChange}
                             className={`pl-8 border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500 ${
-                              formErrors.startingBid ? "border-red-500" : ""
+                              formErrors?.startingBid ? "border-red-500" : ""
                             }`}
                             placeholder="0.00"
                           />
                         </div>
-                        {formErrors.startingBid && <p className="text-xs text-red-500">{formErrors.startingBid}</p>}
+                        {formErrors?.startingBid && <p className="text-xs text-red-500">{formErrors.startingBid}</p>}
                       </div>
 
                       <div className="space-y-2">
@@ -340,12 +437,12 @@ export function SellForm() {
                             value={formData.bidIncrement}
                             onChange={handleInputChange}
                             className={`pl-8 border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500 ${
-                              formErrors.bidIncrement ? "border-red-500" : ""
+                              formErrors?.bidIncrement ? "border-red-500" : ""
                             }`}
                             placeholder="0.00"
                           />
                         </div>
-                        {formErrors.bidIncrement && <p className="text-xs text-red-500">{formErrors.bidIncrement}</p>}
+                        {formErrors?.bidIncrement && <p className="text-xs text-red-500">{formErrors.bidIncrement}</p>}
                       </div>
 
                       <div className="space-y-2">
@@ -369,31 +466,58 @@ export function SellForm() {
                         </p>
                       </div>
 
+                      {/* Duration */}
                       <div className="space-y-2">
                         <Label htmlFor="duration">
-                          Duration <span className="text-red-500">*</span>
+                          Auction Duration <span className="text-red-500">*</span>
                         </Label>
-                        <Select
-                          onValueChange={(value) => handleSelectChange("duration", value)}
-                          defaultValue={formData.duration}
-                        >
-                          <SelectTrigger
-                            id="duration"
-                            className={`w-full border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500 ${
-                              formErrors.duration ? "border-red-500" : ""
-                            }`}
-                          >
-                            <SelectValue placeholder="Select duration" />
-                          </SelectTrigger>
-                          <SelectContent className="border-zinc-700 bg-zinc-800 text-white">
-                            <SelectItem value="1">1 Day</SelectItem>
-                            <SelectItem value="3">3 Days</SelectItem>
-                            <SelectItem value="7">7 Days</SelectItem>
-                            <SelectItem value="14">14 Days</SelectItem>
-                            <SelectItem value="30">30 Days</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {formErrors.duration && <p className="text-xs text-red-500">{formErrors.duration}</p>}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="durationDays"
+                                name="durationDays"
+                                type="number"
+                                min="0"
+                                value={formData.durationDays}
+                                onChange={handleInputChange}
+                                className="border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500"
+                              />
+                              <Label htmlFor="durationDays" className="whitespace-nowrap">Days</Label>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="durationHours"
+                                name="durationHours"
+                                type="number"
+                                min="0"
+                                max="23"
+                                value={formData.durationHours}
+                                onChange={handleInputChange}
+                                className="border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500"
+                              />
+                              <Label htmlFor="durationHours" className="whitespace-nowrap">Hours</Label>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="durationMinutes"
+                                name="durationMinutes"
+                                type="number"
+                                min="0"
+                                max="59"
+                                value={formData.durationMinutes}
+                                onChange={handleInputChange}
+                                className="border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500"
+                              />
+                              <Label htmlFor="durationMinutes" className="whitespace-nowrap">Minutes</Label>
+                            </div>
+                          </div>
+                        </div>
+                        {formErrors?.duration && <p className="text-xs text-red-500">{formErrors.duration}</p>}
                       </div>
                     </div>
                   )}
@@ -425,7 +549,7 @@ export function SellForm() {
                           By checking this box, you confirm that you have legal ownership or control of the asset being
                           listed.
                         </p>
-                        {formErrors.ownershipConfirmed && (
+                        {formErrors?.ownershipConfirmed && (
                           <p className="text-xs text-red-500">{formErrors.ownershipConfirmed}</p>
                         )}
                       </div>

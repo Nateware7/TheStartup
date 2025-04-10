@@ -1,10 +1,11 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { CheckCircle } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useSubscription } from "@/hooks/use-subscription"
 import { AccessRestrictedModal } from "@/components/access-restricted-modal"
+import { ProductTimer } from "@/components/product-timer"
 
 // Define Product interface based on the actual data structure
 interface Seller {
@@ -30,6 +31,12 @@ interface Product {
   category: string
   assetType?: string
   seller?: Seller
+  durationDays?: number
+  durationHours?: number
+  durationMinutes?: number
+  durationString?: string
+  expiresAt?: any // Firestore timestamp
+  createdAt?: any
   stats?: {
     sales: number
     lastSold: string
@@ -46,6 +53,9 @@ export function ProductCard({ product }: { product: Product }) {
   const { canPerformAction, subscriptionTier } = useSubscription()
   const [showModal, setShowModal] = useState(false)
   const [actionType, setActionType] = useState<"buy" | "bid" | null>(null)
+  
+  // Determine if this is an auction product
+  const isAuction = product?.currentBid !== undefined && product?.startingBid !== undefined
 
   if (!product) return null
 
@@ -59,9 +69,6 @@ export function ProductCard({ product }: { product: Product }) {
       .join("")
       .toUpperCase()
   }
-
-  // Determine if this is an auction product
-  const isAuction = product.currentBid !== undefined && product.startingBid !== undefined
 
   const handleAction = (action: "buy" | "bid") => {
     if (!canPerformAction(action)) {
@@ -114,16 +121,35 @@ export function ProductCard({ product }: { product: Product }) {
         {/* Content - Product info */}
         <div className="p-4 flex-1 flex flex-col">
           <div className="flex-1">
-            <Link href={`/product/${product.id}`}>
-              <h3 className="mb-1 text-base font-bold leading-tight text-white hover:text-violet-300 transition-colors line-clamp-1">
-                {product.title}
-              </h3>
-            </Link>
+            <div className="flex justify-between items-start mb-1">
+              <Link href={`/product/${product.id}`}>
+                <h3 className="text-base font-bold leading-tight text-white hover:text-violet-300 transition-colors line-clamp-1">
+                  {product.title}
+                </h3>
+              </Link>
+              
+              {/* Time chip - now using ProductTimer component */}
+              <div className="flex items-center bg-zinc-800 rounded-full px-2.5 py-1 text-[10px] border border-zinc-700/50">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <ProductTimer 
+                  expiresAt={product.expiresAt}
+                  durationString={product.durationString}
+                  durationDays={product.durationDays}
+                  durationHours={product.durationHours}
+                  durationMinutes={product.durationMinutes}
+                  className="font-medium"
+                  prefix={isAuction ? "Ends: " : ""}
+                  isAuction={isAuction}
+                />
+              </div>
+            </div>
             <p className="line-clamp-1 text-xs text-zinc-400 mb-3">{product.description}</p>
           </div>
 
           {/* Price info - Fixed height regardless of auction or buy-now */}
-          <div className="mb-3 h-12 flex items-end">
+          <div className="mb-3 flex items-end justify-between">
             {isAuction ? (
               <div className="w-full">
                 <div className="flex justify-between items-end">
@@ -143,7 +169,7 @@ export function ProductCard({ product }: { product: Product }) {
               </div>
             )}
           </div>
-
+          
           {/* Action buttons - fixed height */}
           <div className="flex gap-2 h-9">
             {isAuction ? (

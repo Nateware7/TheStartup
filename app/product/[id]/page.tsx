@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AnimatedBackground } from "@/components/animated-background"
 import { AuctionLog } from "@/components/auction-log"
 import { MessageButton } from "@/components/message-button"
+import { ProductTimer } from "@/components/product-timer"
 import { useState, useEffect } from "react"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { db, auth } from "@/lib/firebaseConfig"
@@ -27,6 +28,12 @@ interface Product {
   price: number;
   category: string;
   assetType: string;
+  durationDays?: number;
+  durationHours?: number;
+  durationMinutes?: number;
+  durationString?: string;
+  expiresAt?: any;
+  createdAt?: any;
   seller: {
     id: string;
     name: string;
@@ -37,7 +44,6 @@ interface Product {
     sales: number;
     rating: number;
   };
-  createdAt: any; // Use appropriate type for Timestamp
   status: "active" | "sold";
   bid?: number;
   auctionLog?: Array<{ username: string; amount: number; timestamp: string; isLeading?: boolean }>;
@@ -113,8 +119,13 @@ export default function ProductPage() {
             price: data.price || 0,
             category: data.category || "",
             assetType: data.assetType || "username",
-            seller: sellerInfo,
+            durationDays: data.durationDays || 0,
+            durationHours: data.durationHours || 0,
+            durationMinutes: data.durationMinutes || 0,
+            durationString: data.durationString || "",
+            expiresAt: data.expiresAt || null,
             createdAt: data.createdAt || new Date(),
+            seller: sellerInfo,
             status: data.status || "active",
             bid: data.bid,
             auctionLog: data.auctionLog || [],
@@ -331,7 +342,13 @@ export default function ProductPage() {
 
                 <div className="mb-6">
                   <h2 className="mb-4 text-xl font-semibold">About This Product</h2>
-                  <p className="text-zinc-300 leading-relaxed text-base">{product.longDescription}</p>
+                  <div className="text-zinc-300 leading-relaxed text-base whitespace-pre-wrap break-words">
+                    {product.longDescription?.split('\n').map((paragraph, index) => (
+                      <p key={index} className={index !== 0 ? "mt-4" : ""}>
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Auction log for auction products - displayed directly below description */}
@@ -389,7 +406,15 @@ export default function ProductPage() {
                       {error && <div className="text-red-500 text-sm">{error}</div>}
                       {success && <div className="text-green-500 text-sm">{success}</div>}
                       <div className="text-sm text-zinc-500">
-                        Auction ends in <span className="text-white font-medium">2 days 14 hours</span>
+                        Auction <ProductTimer 
+                          expiresAt={product.expiresAt}
+                          durationString={product.durationString}
+                          durationDays={product.durationDays}
+                          durationHours={product.durationHours}
+                          durationMinutes={product.durationMinutes}
+                          className="text-white font-medium"
+                          prefix=""
+                        />
                       </div>
                     </div>
                   ) : (

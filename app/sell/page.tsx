@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Input } from "@/components/ui/input"
 import { auth, db } from '@/lib/firebaseConfig'
-import { doc, addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { doc, addDoc, collection, serverTimestamp, Timestamp } from 'firebase/firestore'
 import toast from 'react-hot-toast'
 import { useRouter } from 'next/navigation'
 import { AnimatedBackground } from '@/components/animated-background'
@@ -31,8 +31,17 @@ const fixedPriceSchema = z.object({
   category: z.string().min(1, "Category is required"),
   assetType: z.string().min(1, "Asset type is required"),
   price: z.coerce.number().min(1, "Price must be at least 1"),
+  durationDays: z.coerce.number().min(0),
+  durationHours: z.coerce.number().min(0).max(23),
+  durationMinutes: z.coerce.number().min(0).max(59),
   status: z.string()
-})
+}).refine((data) => {
+  const totalMinutes = (data.durationDays * 24 * 60) + (data.durationHours * 60) + data.durationMinutes;
+  return totalMinutes > 0;
+}, {
+  message: "Duration must be greater than zero",
+  path: ["durationDays"]
+});
 
 const auctionSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters").max(100),
@@ -41,8 +50,17 @@ const auctionSchema = z.object({
   category: z.string().min(1, "Category is required"),
   assetType: z.string().min(1, "Asset type is required"),
   startingBid: z.coerce.number().min(1, "Starting bid must be at least 1"),
+  durationDays: z.coerce.number().min(0),
+  durationHours: z.coerce.number().min(0).max(23),
+  durationMinutes: z.coerce.number().min(0).max(59),
   status: z.string()
-})
+}).refine((data) => {
+  const totalMinutes = (data.durationDays * 24 * 60) + (data.durationHours * 60) + data.durationMinutes;
+  return totalMinutes > 0;
+}, {
+  message: "Duration must be greater than zero",
+  path: ["durationDays"]
+});
 
 type FixedPriceFormData = z.infer<typeof fixedPriceSchema>
 type AuctionFormData = z.infer<typeof auctionSchema>
@@ -63,6 +81,9 @@ export default function SellPage() {
       category: "insta",
       assetType: "username",
       price: 0,
+      durationDays: 0,
+      durationHours: 0,
+      durationMinutes: 0,
       status: "active"
     }
   })
@@ -77,6 +98,9 @@ export default function SellPage() {
       category: "insta",
       assetType: "username",
       startingBid: 0,
+      durationDays: 0,
+      durationHours: 0,
+      durationMinutes: 0,
       status: "active"
     }
   })
@@ -105,6 +129,11 @@ export default function SellPage() {
 
     setIsLoading(true)
     try {
+      // Calculate expiration date based on duration
+      const totalMinutes = (data.durationDays * 24 * 60) + (data.durationHours * 60) + data.durationMinutes
+      const expirationDate = new Date()
+      expirationDate.setMinutes(expirationDate.getMinutes() + totalMinutes)
+      
       const listingData = {
         title: data.title,
         description: data.description,
@@ -112,10 +141,15 @@ export default function SellPage() {
         category: data.category,
         assetType: data.assetType,
         price: data.price,
+        durationDays: data.durationDays,
+        durationHours: data.durationHours,
+        durationMinutes: data.durationMinutes,
+        durationString: `${data.durationDays}d ${data.durationHours}h ${data.durationMinutes}m`,
         sellerId: userId,
         isAuction: false,
         status: data.status,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        expiresAt: Timestamp.fromDate(expirationDate)
       }
 
       // Add the document to Firestore
@@ -140,6 +174,11 @@ export default function SellPage() {
 
     setIsLoading(true)
     try {
+      // Calculate expiration date based on duration
+      const totalMinutes = (data.durationDays * 24 * 60) + (data.durationHours * 60) + data.durationMinutes
+      const expirationDate = new Date()
+      expirationDate.setMinutes(expirationDate.getMinutes() + totalMinutes)
+
       const listingData = {
         title: data.title,
         description: data.description,
@@ -149,10 +188,15 @@ export default function SellPage() {
         price: data.startingBid, // Use startingBid as the price
         startingBid: data.startingBid,
         currentBid: data.startingBid, // Initially, current bid equals starting bid
+        durationDays: data.durationDays,
+        durationHours: data.durationHours,
+        durationMinutes: data.durationMinutes,
+        durationString: `${data.durationDays}d ${data.durationHours}h ${data.durationMinutes}m`,
         sellerId: userId,
         isAuction: true,
         status: data.status,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        expiresAt: Timestamp.fromDate(expirationDate)
       }
 
       // Add the document to Firestore
@@ -301,6 +345,59 @@ export default function SellPage() {
                         )}
                       </div>
                       
+                      {/* Duration */}
+                      <div className="space-y-2">
+                        <Label htmlFor="fixed-duration">Listing Duration</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="fixed-durationDays"
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                {...fixedPriceForm.register("durationDays", { valueAsNumber: true })}
+                                className={`bg-zinc-800/50 border-zinc-700 focus:border-violet-500 ${
+                                  fixedPriceForm.formState.errors.durationDays ? "border-red-500" : ""
+                                }`}
+                              />
+                              <Label htmlFor="fixed-durationDays" className="whitespace-nowrap">Days</Label>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="fixed-durationHours"
+                                type="number"
+                                min="0"
+                                max="23"
+                                placeholder="0"
+                                {...fixedPriceForm.register("durationHours", { valueAsNumber: true })}
+                                className="bg-zinc-800/50 border-zinc-700 focus:border-violet-500"
+                              />
+                              <Label htmlFor="fixed-durationHours" className="whitespace-nowrap">Hours</Label>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="fixed-durationMinutes"
+                                type="number"
+                                min="0"
+                                max="59"
+                                placeholder="0"
+                                {...fixedPriceForm.register("durationMinutes", { valueAsNumber: true })}
+                                className="bg-zinc-800/50 border-zinc-700 focus:border-violet-500"
+                              />
+                              <Label htmlFor="fixed-durationMinutes" className="whitespace-nowrap">Min</Label>
+                            </div>
+                          </div>
+                        </div>
+                        {fixedPriceForm.formState.errors.durationDays && (
+                          <p className="text-sm text-red-500">{fixedPriceForm.formState.errors.durationDays.message}</p>
+                        )}
+                      </div>
+                      
                       {/* Status */}
                       <div className="space-y-2">
                         <Label htmlFor="fixed-status">Listing Status</Label>
@@ -438,6 +535,59 @@ export default function SellPage() {
                         />
                         {auctionForm.formState.errors.startingBid && (
                           <p className="text-sm text-red-500">{auctionForm.formState.errors.startingBid.message}</p>
+                        )}
+                      </div>
+                      
+                      {/* Duration */}
+                      <div className="space-y-2">
+                        <Label htmlFor="auction-duration">Auction Duration</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="auction-durationDays"
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                {...auctionForm.register("durationDays", { valueAsNumber: true })}
+                                className={`bg-zinc-800/50 border-zinc-700 focus:border-violet-500 ${
+                                  auctionForm.formState.errors.durationDays ? "border-red-500" : ""
+                                }`}
+                              />
+                              <Label htmlFor="auction-durationDays" className="whitespace-nowrap">Days</Label>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="auction-durationHours"
+                                type="number"
+                                min="0"
+                                max="23"
+                                placeholder="0"
+                                {...auctionForm.register("durationHours", { valueAsNumber: true })}
+                                className="bg-zinc-800/50 border-zinc-700 focus:border-violet-500"
+                              />
+                              <Label htmlFor="auction-durationHours" className="whitespace-nowrap">Hours</Label>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="auction-durationMinutes"
+                                type="number"
+                                min="0"
+                                max="59"
+                                placeholder="0"
+                                {...auctionForm.register("durationMinutes", { valueAsNumber: true })}
+                                className="bg-zinc-800/50 border-zinc-700 focus:border-violet-500"
+                              />
+                              <Label htmlFor="auction-durationMinutes" className="whitespace-nowrap">Min</Label>
+                            </div>
+                          </div>
+                        </div>
+                        {auctionForm.formState.errors.durationDays && (
+                          <p className="text-sm text-red-500">{auctionForm.formState.errors.durationDays.message}</p>
                         )}
                       </div>
                       

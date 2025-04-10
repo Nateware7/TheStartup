@@ -28,6 +28,11 @@ type Product = {
   };
   createdAt: any; // Use appropriate type for Timestamp
   status: "active" | "sold";
+  expiresAt: any; // Use appropriate type for Timestamp
+  durationDays: number;
+  durationHours: number;
+  durationMinutes: number;
+  durationString: string;
 };
 
 interface ProductGridProps {
@@ -59,6 +64,11 @@ export function ProductGrid({ filter }: ProductGridProps = {}) {
             sellerId: data.sellerId || "",
             createdAt: data.createdAt,
             status: data.status || "active",
+            expiresAt: data.expiresAt || null,
+            durationDays: data.durationDays || 0,
+            durationHours: data.durationHours || 0,
+            durationMinutes: data.durationMinutes || 0,
+            durationString: data.durationString || "",
           };
         });
 
