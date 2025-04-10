@@ -35,6 +35,11 @@ import {
   collectionGroup
 } from "firebase/firestore"
 import toast from "react-hot-toast"
+import { 
+  encryptMessage, 
+  decryptMessage, 
+  generateConversationKey 
+} from "@/lib/encryption"
 
 // Define TypeScript interfaces
 interface UserInfo {
@@ -76,6 +81,7 @@ export function MessageCenter() {
   const [searchResults, setSearchResults] = useState<UserInfo[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [atBottom, setAtBottom] = useState(true)
+  const [conversationKey, setConversationKey] = useState<string | null>(null)
   
   // Check if user is at bottom of chat
   const checkIfAtBottom = () => {
@@ -276,6 +282,16 @@ export function MessageCenter() {
     try {
       if (!currentUser) return () => {}
       
+      // Generate the encryption key for this conversation if not already set
+      if (!conversationKey && activeConversation?.otherUser) {
+        try {
+          const key = await generateConversationKey(currentUser.id, activeConversation.otherUser.id)
+          setConversationKey(key)
+        } catch (keyError) {
+          console.error("Failed to generate key:", keyError)
+        }
+      }
+      
       // Get nested messages collection for this conversation
       const messagesRef = collection(db, `conversations/${conversationId}/messages`)
       const messagesQuery = query(
@@ -292,13 +308,30 @@ export function MessageCenter() {
           const messageData = doc.data()
           const messageText = messageData.message as string
           
-          // Add message directly without encryption/decryption
-          messagesData.push({
-            id: doc.id,
-            senderId: messageData.senderId as string,
-            message: messageText || "Message unavailable",
-            createdAt: messageData.createdAt as Timestamp | null
-          })
+          try {
+            // Try to decrypt the message if we have a key
+            let decryptedMessage = messageText
+            
+            if (conversationKey) {
+              decryptedMessage = await decryptMessage(messageText, conversationKey)
+            }
+            
+            messagesData.push({
+              id: doc.id,
+              senderId: messageData.senderId as string,
+              message: decryptedMessage,
+              createdAt: messageData.createdAt as Timestamp | null
+            })
+          } catch (error) {
+            console.error("Error processing message:", error)
+            // Fall back to original message
+            messagesData.push({
+              id: doc.id,
+              senderId: messageData.senderId as string,
+              message: messageText || "Message unavailable",
+              createdAt: messageData.createdAt as Timestamp | null
+            })
+          }
         }
         
         setMessages(messagesData)
@@ -322,6 +355,16 @@ export function MessageCenter() {
     setMobileViewMode('chat')
     setAtBottom(true)
     
+    // Generate key for this conversation
+    if (currentUser && conversation.otherUser) {
+      try {
+        const key = await generateConversationKey(currentUser.id, conversation.otherUser.id)
+        setConversationKey(key)
+      } catch (error) {
+        console.error("Error generating conversation key:", error)
+      }
+    }
+    
     // Clear messages while loading
     setMessages([])
     
@@ -335,8 +378,18 @@ export function MessageCenter() {
     if (!newMessage.trim() || !activeConversation || !currentUser) return
     
     try {
-      // Send message as plain text without encryption
-      const messageToSend = newMessage
+      // Encrypt the message before sending if we have a key
+      let messageToSend = newMessage
+      let messagePreview = newMessage
+      
+      if (conversationKey) {
+        try {
+          messageToSend = await encryptMessage(newMessage, conversationKey)
+        } catch (error) {
+          console.error("Failed to encrypt message:", error)
+          // Continue with unencrypted message if encryption fails
+        }
+      }
       
       // Add message to the nested messages collection
       const messageRef = collection(db, `conversations/${activeConversation.id}/messages`)
@@ -346,10 +399,10 @@ export function MessageCenter() {
         createdAt: serverTimestamp(),
       })
       
-      // Update the conversation with the last message
+      // Update the conversation with the last message (plain text for preview)
       await setDoc(doc(db, "conversations", activeConversation.id), {
         userIds: activeConversation.userIds,
-        lastMessage: newMessage.length > 30 ? newMessage.substring(0, 27) + "..." : newMessage,
+        lastMessage: messagePreview.length > 30 ? messagePreview.substring(0, 27) + "..." : messagePreview,
         updatedAt: serverTimestamp()
       }, { merge: true })
       
