@@ -47,6 +47,7 @@ interface Product {
     timestamp: string
     isLeading?: boolean
   }>
+  status?: string // Add status property to Product interface
 }
 
 export function ProductCard({ product }: { product: Product }) {
@@ -128,11 +129,17 @@ export function ProductCard({ product }: { product: Product }) {
                 </h3>
               </Link>
               
-              {/* Time chip - now using ProductTimer component */}
+              {/* Time chip - now using ProductTimer component with status */}
               <div className="flex items-center bg-zinc-800 rounded-full px-2.5 py-1 text-[10px] border border-zinc-700/50">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                {product.status === "processing" ? (
+                  <span className="h-3 w-3 animate-pulse bg-amber-500 rounded-full mr-1.5"></span>
+                ) : product.status === "sold" ? (
+                  <CheckCircle className="h-3 w-3 mr-1 text-emerald-400 fill-emerald-400" />
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1 text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
                 <ProductTimer 
                   expiresAt={product.expiresAt}
                   durationString={product.durationString}
@@ -140,8 +147,13 @@ export function ProductCard({ product }: { product: Product }) {
                   durationHours={product.durationHours}
                   durationMinutes={product.durationMinutes}
                   className="font-medium"
-                  prefix={isAuction ? "Ends: " : ""}
+                  prefix={isAuction && !product.status?.match(/processing|sold/) ? "Ends: " : ""}
                   isAuction={isAuction}
+                  status={
+                    product.status === "processing" ? "processing" : 
+                    product.status === "sold" ? "sold" : 
+                    undefined
+                  }
                 />
               </div>
             </div>
@@ -158,14 +170,18 @@ export function ProductCard({ product }: { product: Product }) {
                     <div className="text-xs text-zinc-300">${typeof product.startingBid === 'number' ? product.startingBid.toFixed(2) : '0.00'}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[10px] text-zinc-500">Current Bid</div>
-                    <div className="text-sm font-bold text-emerald-400">${typeof product.currentBid === 'number' ? product.currentBid.toFixed(2) : '0.00'}</div>
+                    <div className="text-[10px] text-zinc-500">{product.status === "sold" ? "Final Bid" : "Current Bid"}</div>
+                    <div className={`text-sm font-bold ${product.status === "sold" ? "text-emerald-500" : "text-emerald-400"}`}>
+                      ${typeof product.currentBid === 'number' ? product.currentBid.toFixed(2) : '0.00'}
+                    </div>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="flex items-end h-full">
-                <div className="text-base font-bold text-white">${product.price.toFixed(2)}</div>
+                <div className={`text-base font-bold ${product.status === "sold" ? "text-emerald-500" : "text-white"}`}>
+                  ${product.price.toFixed(2)}
+                </div>
               </div>
             )}
           </div>
@@ -173,19 +189,37 @@ export function ProductCard({ product }: { product: Product }) {
           {/* Action buttons - fixed height */}
           <div className="flex gap-2 h-9">
             {isAuction ? (
-              <button
-                className="flex-1 rounded-md bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-1.5 text-xs font-medium text-white"
-                onClick={() => handleAction("bid")}
-              >
-                Place Bid
-              </button>
+              product.status === "sold" ? (
+                <button
+                  disabled
+                  className="flex-1 rounded-md bg-emerald-700/50 px-3 py-1.5 text-xs font-medium text-white opacity-70"
+                >
+                  Sold
+                </button>
+              ) : (
+                <button
+                  className="flex-1 rounded-md bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-1.5 text-xs font-medium text-white"
+                  onClick={() => handleAction("bid")}
+                >
+                  Place Bid
+                </button>
+              )
             ) : (
-              <button
-                className="flex-1 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-1.5 text-xs font-medium text-white"
-                onClick={() => handleAction("buy")}
-              >
-                Buy Now
-              </button>
+              product.status === "sold" ? (
+                <button
+                  disabled
+                  className="flex-1 rounded-md bg-emerald-700/50 px-3 py-1.5 text-xs font-medium text-white opacity-70"
+                >
+                  Sold
+                </button>
+              ) : (
+                <button
+                  className="flex-1 rounded-md bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-1.5 text-xs font-medium text-white"
+                  onClick={() => handleAction("buy")}
+                >
+                  Buy Now
+                </button>
+              )
             )}
             <Link href={`/product/${product.id}`} className="block">
               <button className="h-full rounded-md border border-zinc-700 bg-zinc-800/40 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 transition-colors cursor-pointer">

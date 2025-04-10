@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react"
 
+type TimerStatus = "active" | "processing" | "sold" | "expired";
+
 interface ProductTimerProps {
   expiresAt?: any; // Firestore timestamp
   durationString?: string;
@@ -12,6 +14,7 @@ interface ProductTimerProps {
   prefix?: string; // Optional prefix like "Ends: " or "Auction ends in"
   isAuction?: boolean; // Optional flag to style differently based on auction status
   onExpired?: () => void; // Callback function to trigger when auction expires
+  status?: TimerStatus; // Using consistent type
 }
 
 // Static helper function to check if a timer is expired
@@ -52,19 +55,32 @@ export function ProductTimer({
   className = "",
   prefix = "",
   isAuction = false,
-  onExpired
+  onExpired,
+  status
 }: ProductTimerProps) {
   const [remainingTime, setRemainingTime] = useState<string>("");
   const [isExpired, setIsExpired] = useState(false);
 
   useEffect(() => {
+    // If we have a specific status, use that for display instead of calculating time
+    if (status === "processing") {
+      setRemainingTime("Processing");
+      return;
+    }
+    
+    if (status === "sold") {
+      setRemainingTime("Sold");
+      return;
+    }
+    
     console.log("ProductTimer props:", { 
       expiresAt, 
       hasToDate: expiresAt?.toDate ? true : false,
       durationString, 
       durationDays, 
       durationHours, 
-      durationMinutes 
+      durationMinutes,
+      status
     });
     
     if (!expiresAt) {
@@ -189,19 +205,41 @@ export function ProductTimer({
     const interval = setInterval(calculateRemainingTime, 1000);
     
     return () => clearInterval(interval);
-  }, [expiresAt, durationString, durationDays, durationHours, durationMinutes, onExpired, isExpired]);
+  }, [expiresAt, durationString, durationDays, durationHours, durationMinutes, onExpired, isExpired, status]);
 
   // If there's no time data yet, show a loading state
   if (!remainingTime) {
     return <span className={className}>Loading...</span>;
   }
 
+  // Determine display text based on status
+  let displayText = remainingTime;
+  if (status === "processing") {
+    displayText = "Processing";
+  } else if (status === "sold") {
+    displayText = "Sold";
+  } else if (remainingTime === "Expired") {
+    displayText = "Expired";
+  } else {
+    displayText = `${prefix}${remainingTime}`;
+  }
+
+  // Handle special status colors
+  let statusColor = "";
+  if (status === "processing") {
+    statusColor = "text-amber-400";
+  } else if (status === "sold") {
+    statusColor = "text-emerald-500";
+  } else if (isExpired || remainingTime === "Expired") {
+    statusColor = "text-red-400";
+  } else if (isAuction) {
+    statusColor = "text-emerald-400";
+  }
+
   // Return the formatted time
   return (
-    <span className={`${className} ${isAuction ? "text-emerald-400" : ""} ${isExpired ? "text-red-400" : ""}`}>
-      {remainingTime === "Expired" 
-        ? remainingTime 
-        : `${prefix}${remainingTime}`}
+    <span className={`${className} ${statusColor}`}>
+      {displayText}
     </span>
   );
 } 

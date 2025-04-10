@@ -5,12 +5,15 @@ import { Timestamp } from "firebase/firestore"
 import { checkAndUpdateAuctionStatus } from "@/lib/auction"
 import { toast } from "sonner"
 
+type TimerStatus = "active" | "processing" | "sold" | "expired";
+
 interface AuctionTimerProps {
   expiresAt?: any; // Firestore timestamp
   listingId: string;
   isComplete: boolean;
   className?: string;
   onStatusChange?: (isComplete: boolean) => void;
+  status?: TimerStatus; // Using the defined type
 }
 
 // Helper function to check if a timer is expired
@@ -47,13 +50,25 @@ export function AuctionTimer({
   listingId,
   isComplete,
   className = "",
-  onStatusChange
+  onStatusChange,
+  status
 }: AuctionTimerProps) {
   const [remainingTime, setRemainingTime] = useState<string>("");
   const [expired, setExpired] = useState(false);
   const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
+    // If we have a specific status, use that for display instead of calculating time
+    if (status === "processing") {
+      setRemainingTime("Processing");
+      return;
+    }
+    
+    if (status === "sold") {
+      setRemainingTime("Sold");
+      return;
+    }
+    
     if (!expiresAt || isComplete) {
       setRemainingTime(isComplete ? "Completed" : "No end time");
       return;
@@ -87,7 +102,7 @@ export function AuctionTimer({
             setRemainingTime("Expired");
             
             // Auto-complete the auction if not already complete
-            if (!isComplete) {
+            if (!isComplete && !status) {
               completeAuction();
             }
           }
@@ -122,35 +137,62 @@ export function AuctionTimer({
     const interval = setInterval(calculateRemainingTime, 1000);
     
     return () => clearInterval(interval);
-  }, [expiresAt, isComplete, expired]);
+  }, [expiresAt, isComplete, expired, status]);
 
   // Function to handle auction completion
   const completeAuction = async () => {
     if (isComplete || completing) return;
     
     setCompleting(true);
+    setRemainingTime("Processing");
     try {
       const updated = await checkAndUpdateAuctionStatus(listingId);
       if (updated) {
         if (onStatusChange) {
           onStatusChange(true);
         }
+        setRemainingTime("Completed");
         toast.success("Auction has completed");
       }
     } catch (error) {
       console.error("Error completing auction:", error);
+      setRemainingTime("Expired");
     } finally {
       setCompleting(false);
     }
   };
 
+  // Handle special status colors
+  let statusColor = "";
+  if (completing || status === "processing") {
+    statusColor = "text-amber-400";
+  } else if (status === "sold") {
+    statusColor = "text-emerald-500";
+  } else if (expired && !isComplete) {
+    statusColor = "text-red-400";
+  } else if (isComplete) {
+    statusColor = "text-amber-400";
+  }
+
+  // Determine the display text based on status and completion
+  let displayText = remainingTime;
+  if (completing) {
+    displayText = "Processing";
+  } else if (status === "processing") {
+    displayText = "Processing";
+  } else if (status === "sold") {
+    displayText = "Sold";
+  } else if (isComplete) {
+    displayText = "Completed";
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      <span className={`${className} ${expired && !isComplete ? "text-red-400" : isComplete ? "text-amber-400" : ""}`}>
-        {isComplete ? "Completed" : remainingTime}
+      <span className={`${className} ${statusColor}`}>
+        {displayText}
       </span>
       
-      {expired && !isComplete && (
+      {expired && !isComplete && !status && (
         <button
           onClick={completeAuction}
           disabled={completing}

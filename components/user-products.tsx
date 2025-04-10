@@ -6,7 +6,7 @@ import { Loader, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { db } from "@/lib/firebaseConfig"
-import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore"
+import { collection, query, where, getDocs, getDoc, doc, onSnapshot, Unsubscribe } from "firebase/firestore"
 import { ProductCard } from "@/components/product-card"
 
 // Define product type
@@ -54,74 +54,93 @@ export function UserProducts({ userId }: UserProductsProps) {
   const [activeFilter, setActiveFilter] = useState("all")
 
   useEffect(() => {
-    async function fetchUserProducts() {
+    function fetchUserProducts(): Unsubscribe | undefined {
       try {
         setLoading(true)
         
         // Query firestore for products where seller/creator is the userId
         const q = query(collection(db, "listings"), where("sellerId", "==", userId))
-        const querySnapshot = await getDocs(q)
         
-        const userProducts: Product[] = []
-        
-        querySnapshot.forEach((doc) => {
-          const data = doc.data()
-          userProducts.push({
-            id: doc.id,
-            title: data.title || "Untitled Product",
-            type: data.category || "Other",
-            category: data.category || "Other",
-            description: data.description || "",
-            longDescription: data.longDescription || "",
-            price: data.price || 0,
-            startingBid: data.startingBid,
-            currentBid: data.currentBid,
-            bid: data.currentBid || null,
-            image: data.image || "/placeholder.svg?height=600&width=600",
-            sellerId: userId,
-            assetType: data.assetType || "username",
-            status: data.status || "active",
-            isAuction: data.isAuction || false,
-            expiresAt: data.expiresAt,
-            durationDays: data.durationDays,
-            durationHours: data.durationHours,
-            durationMinutes: data.durationMinutes,
-            durationString: data.durationString
+        // Use onSnapshot for real-time updates
+        const unsubscribe = onSnapshot(q, async (querySnapshot) => {
+          const userProducts: Product[] = []
+          
+          querySnapshot.forEach((doc) => {
+            const data = doc.data()
+            userProducts.push({
+              id: doc.id,
+              title: data.title || "Untitled Product",
+              type: data.category || "Other",
+              category: data.category || "Other",
+              description: data.description || "",
+              longDescription: data.longDescription || "",
+              price: data.price || 0,
+              startingBid: data.startingBid,
+              currentBid: data.currentBid,
+              bid: data.currentBid || null,
+              image: data.image || "/placeholder.svg?height=600&width=600",
+              sellerId: userId,
+              assetType: data.assetType || "username",
+              status: data.status || "active",
+              isAuction: data.isAuction || false,
+              expiresAt: data.expiresAt,
+              durationDays: data.durationDays,
+              durationHours: data.durationHours,
+              durationMinutes: data.durationMinutes,
+              durationString: data.durationString
+            })
           })
-        })
-        
-        // Get the user information
-        const userDoc = await getDoc(doc(db, "users", userId))
-        if (userDoc.exists()) {
-          const userData = userDoc.data()
-          const sellerInfo = {
-            id: userId,
-            name: userData.username || userData.displayName || "Anonymous",
-            handle: userData.handle || `@${(userData.username || 'user').toLowerCase().replace(/\s+/g, '')}`,
-            avatar: userData.profilePicture || userData.photoURL || "/placeholder.svg?height=200&width=200",
-            verified: userData.isVerified || false,
-            joinDate: userData.createdAt ? new Date(userData.createdAt.toDate()).toLocaleDateString() : "Unknown",
-            sales: userData.sales || 0,
-            rating: userData.rating || 0,
+          
+          // Get the user information
+          const userDoc = await getDoc(doc(db, "users", userId))
+          if (userDoc.exists()) {
+            const userData = userDoc.data()
+            const sellerInfo = {
+              id: userId,
+              name: userData.username || userData.displayName || "Anonymous",
+              handle: userData.handle || `@${(userData.username || 'user').toLowerCase().replace(/\s+/g, '')}`,
+              avatar: userData.profilePicture || userData.photoURL || "/placeholder.svg?height=200&width=200",
+              verified: userData.isVerified || false,
+              joinDate: userData.createdAt ? new Date(userData.createdAt.toDate()).toLocaleDateString() : "Unknown",
+              sales: userData.sales || 0,
+              rating: userData.rating || 0,
+            }
+            
+            // Add seller info to all products
+            userProducts.forEach(product => {
+              product.seller = sellerInfo
+            })
           }
           
-          // Add seller info to all products
-          userProducts.forEach(product => {
-            product.seller = sellerInfo
-          })
-        }
+          setProducts(userProducts)
+          setFilteredProducts(
+            activeFilter === "all" 
+              ? userProducts 
+              : userProducts.filter(product => product.status === activeFilter)
+          )
+          setLoading(false)
+        }, (error) => {
+          console.error("Error in products listener:", error)
+          setLoading(false)
+        })
         
-        setProducts(userProducts)
-        setFilteredProducts(userProducts)
+        return unsubscribe
       } catch (error) {
         console.error("Error fetching user products:", error)
-      } finally {
         setLoading(false)
+        return undefined
       }
     }
     
-    fetchUserProducts()
-  }, [userId])
+    const unsubscribe = fetchUserProducts()
+    
+    // Clean up the listener when the component unmounts
+    return () => {
+      if (unsubscribe) {
+        unsubscribe()
+      }
+    }
+  }, [userId, activeFilter])
   
   // Filter products when tab changes
   useEffect(() => {

@@ -36,7 +36,9 @@ import {
   deleteDoc,
   updateDoc, 
   orderBy,
-  Timestamp 
+  Timestamp,
+  onSnapshot,
+  Unsubscribe
 } from "firebase/firestore"
 import toast from "react-hot-toast"
 import { useRouter } from "next/navigation"
@@ -135,111 +137,149 @@ export function SellerDashboard() {
 
   // Fetch user listings
   useEffect(() => {
-    async function fetchListings() {
+    function fetchListings(): Unsubscribe | undefined {
+      // Add a check for auth loading state
+      if (auth.currentUser === null && !auth.currentUser) {
+        // Only redirect if we're sure auth is fully loaded and user is null
+        const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+          if (!user) {
+            router.push("/login");
+          }
+          // Cleanup this listener once we've checked
+          unsubscribeAuth();
+        });
+        return;
+      }
+
       try {
-        const user = auth.currentUser
-        if (!user) {
-          toast.error("You must be logged in to view your dashboard")
-          router.push("/auth/signin")
-          return
+        setIsLoading(true);
+        const userId = auth.currentUser?.uid;
+        
+        // Only proceed if we have a valid user ID
+        if (!userId) {
+          setIsLoading(false);
+          return;
         }
 
-        setIsLoading(true)
+        // Create a Firestore query for the user's listings
+        const listingsRef = collection(db, "listings");
+        const q = query(listingsRef, where("sellerId", "==", userId));
         
-        // Get listings from Firestore
-        const listingsRef = collection(db, "listings")
-        const q = query(
-          listingsRef,
-          where("sellerId", "==", user.uid)
-        )
-        
-        const querySnapshot = await getDocs(q)
-        const fetchedListings: Listing[] = []
-        
-        querySnapshot.forEach((doc) => {
-          const data = doc.data()
-          fetchedListings.push({
-            id: doc.id,
-            title: data.title || "Untitled Listing",
-            type: data.category || "Other",
-            category: data.category || "Other",
-            platform: data.platform || "",
-            assetType: data.assetType || "username",
-            price: data.price || 0,
-            isAuction: data.isAuction !== undefined ? data.isAuction : !!data.currentBid,
-            currentBid: data.currentBid,
-            status: data.status || "draft",
-            image: data.image || "/placeholder.svg?height=100&width=100",
-            createdAt: data.createdAt,
-            sellerId: data.sellerId
+        // Use onSnapshot instead of getDocs for real-time updates
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+          const listingsData: Listing[] = []
+          let activeCount = 0
+          let soldCount = 0
+          let draftCount = 0
+          let totalRev = 0
+
+          querySnapshot.forEach((doc) => {
+            const data = doc.data()
+            const listing: Listing = {
+              id: doc.id,
+              title: data.title || "Untitled Listing",
+              type: data.category || "Other",
+              category: data.category || "Other",
+              platform: data.platform || "",
+              assetType: data.assetType || "username",
+              price: data.price || 0,
+              isAuction: data.isAuction !== undefined ? data.isAuction : !!data.currentBid,
+              currentBid: data.currentBid,
+              status: data.status || "draft",
+              image: data.image || "/placeholder.svg?height=100&width=100",
+              createdAt: data.createdAt,
+              sellerId: data.sellerId
+            }
+            
+            listingsData.push(listing)
+            
+            // Count by status
+            if (listing.status === "active") activeCount++
+            else if (listing.status === "sold") {
+              soldCount++
+              totalRev += parseFloat(listing.price.toString() || "0")
+            }
+            else if (listing.status === "draft") draftCount++
           })
+
+          // Update state with the new data
+          setListings(listingsData)
+          
+          // Update stats
+          setStats([
+            {
+              title: "Total Revenue",
+              value: `$${totalRev.toFixed(2)}`,
+              change: "+0%", // You would calculate this from historical data
+              subtext: "Total Revenue Earned ",
+              isPositive: true,
+              icon: DollarSign,
+              color: "from-emerald-500 to-teal-500",
+            },
+            {
+              title: "Total Sales",
+              value: soldCount.toString(),
+              subtext: "Products Sold",
+              change: "+0", // You would calculate this from historical data
+              isPositive: true,
+              icon: ShoppingBag,
+              color: "from-blue-500 to-indigo-500",
+            },
+            {
+              title: "Active Listings",
+              value: activeCount.toString(),
+              subtext: "Live Listings",
+              change: "+0", // You would calculate this from historical data
+              isPositive: true,
+              icon: Tag,
+              color: "from-violet-500 to-purple-500",
+            },
+            {
+              title: "Draft Listings",
+              value: draftCount.toString(),
+              subtext: "Not Yet Published",
+              change: "+0", // You would calculate this from historical data
+              isPositive: true,
+              icon: Clock,
+              color: "from-amber-500 to-orange-500",
+            },
+          ])
+          
+          setIsLoading(false)
+        }, (error) => {
+          console.error("Error in listings listener:", error)
+          toast.error("Failed to load real-time dashboard updates")
+          setIsLoading(false)
         })
         
-        setListings(fetchedListings)
-        
-        // Compute stats
-        const activeListings = fetchedListings.filter(listing => listing.status === "active").length
-        const draftListings = fetchedListings.filter(listing => listing.status === "draft").length
-        const soldItems = fetchedListings.filter(listing => listing.status === "sold").length
-        
-        // Calculate total revenue
-        let totalRevenue = 0
-        fetchedListings.forEach(listing => {
-          if (listing.status === "sold") {
-            totalRevenue += listing.isAuction && listing.currentBid 
-              ? listing.currentBid 
-              : listing.price
-          }
-        })
-        
-        // Update stats
-        setStats([
-          {
-            title: "Total Revenue",
-            value: `$${totalRevenue.toFixed(2)}`,
-            change: "+0%", // You would calculate this from historical data
-            isPositive: true,
-            icon: DollarSign,
-            color: "from-emerald-500 to-teal-500",
-          },
-          {
-            title: "Total Sales",
-            value: soldItems.toString(),
-            subtext: "Products Sold",
-            change: "+0", // You would calculate this from historical data
-            isPositive: true,
-            icon: ShoppingBag,
-            color: "from-blue-500 to-indigo-500",
-          },
-          {
-            title: "Active Listings",
-            value: activeListings.toString(),
-            subtext: "Live Listings",
-            change: "+0", // You would calculate this from historical data
-            isPositive: true,
-            icon: Tag,
-            color: "from-violet-500 to-purple-500",
-          },
-          {
-            title: "Draft Listings",
-            value: draftListings.toString(),
-            subtext: "Not Yet Published",
-            change: "+0", // You would calculate this from historical data
-            isPositive: true,
-            icon: Clock,
-            color: "from-amber-500 to-orange-500",
-          },
-        ])
-        
+        // Return the unsubscribe function
+        return unsubscribe
       } catch (error) {
-        console.error("Error fetching listings:", error)
+        console.error("Error setting up listings listener:", error)
         toast.error("Failed to load dashboard data")
-      } finally {
         setIsLoading(false)
+        return undefined
       }
     }
     
-    fetchListings()
+    // Initialize the auth state listener that will fetch listings once ready
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (user) {
+        const unsubscribeFirestore = fetchListings()
+        
+        // Return cleanup function to unsubscribe both listeners
+        return () => {
+          if (unsubscribeFirestore) {
+            unsubscribeFirestore()
+          }
+        }
+      } else {
+        router.push("/login")
+      }
+    })
+    
+    // Clean up the auth state listener
+    return () => unsubscribeAuth()
   }, [router])
   
   // Filter listings when activeTab or searchQuery changes
@@ -585,12 +625,7 @@ function StatCard({ stat }: { stat: any }) {
         </div>
       </div>
 
-      {stat.change && (
-        <div className="mt-3 flex items-center text-xs">
-          <span className={stat.isPositive ? "text-green-500" : "text-red-500"}>{stat.change}</span>
-          <span className="ml-1 text-zinc-500">from last month</span>
-        </div>
-      )}
+
     </motion.div>
   )
 }

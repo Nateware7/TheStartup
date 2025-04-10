@@ -9,7 +9,7 @@ import { AuctionLog } from "@/components/auction-log"
 import { MessageButton } from "@/components/message-button"
 import { ProductTimer, isTimerExpired } from "@/components/product-timer"
 import { useState, useEffect } from "react"
-import { doc, getDoc, updateDoc } from "firebase/firestore"
+import { doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore"
 import { db, auth } from "@/lib/firebaseConfig"
 import { usePathname } from "next/navigation"
 import { format } from "date-fns"
@@ -77,17 +77,14 @@ export default function ProductPage() {
   const productId = pathname ? pathname.split('/').pop() : '';
 
   useEffect(() => {
-    let isMounted = true;
+    if (!productId) return;
     
-    async function fetchProduct() {
-      if (!productId) return;
-      
-      try {
-        const docRef = doc(db, "listings", productId);
-        const docSnap = await getDoc(docRef);
-        
-        if (!isMounted) return;
-        
+    setLoading(true);
+    
+    // Set up real-time listener for product updates
+    const unsubscribe = onSnapshot(
+      doc(db, "listings", productId),
+      async (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           
@@ -97,7 +94,7 @@ export default function ProductPage() {
               data.confirmation?.winnerConfirmed === true && 
               data.status !== "sold") {
             // Update status to "sold"
-            await updateDoc(docRef, { status: "sold" });
+            await updateDoc(doc(db, "listings", productId), { status: "sold" });
             console.log(`Updated listing ${productId} status to sold`);
             data.status = "sold";
           }
@@ -180,20 +177,16 @@ export default function ProductPage() {
         } else {
           setProduct(null);
         }
-      } catch (error) {
-        console.error("Error fetching product:", error);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error in product listener:", error);
+        setLoading(false);
       }
-    }
+    );
     
-    fetchProduct();
-    
-    return () => {
-      isMounted = false;
-    };
+    // Clean up the listener when the component unmounts
+    return () => unsubscribe();
   }, [productId]);
 
   const handleBid = async () => {
