@@ -35,11 +35,6 @@ import {
   collectionGroup
 } from "firebase/firestore"
 import toast from "react-hot-toast"
-import { 
-  encryptMessage, 
-  decryptMessage, 
-  generateConversationKey 
-} from "@/lib/encryption"
 
 // Define TypeScript interfaces
 interface UserInfo {
@@ -61,7 +56,6 @@ interface Message {
   senderId: string
   message: string
   createdAt: Timestamp | null
-  isDecrypted?: boolean
 }
 
 export function MessageCenter() {
@@ -82,7 +76,6 @@ export function MessageCenter() {
   const [searchResults, setSearchResults] = useState<UserInfo[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [atBottom, setAtBottom] = useState(true)
-  const [conversationKey, setConversationKey] = useState<string | null>(null)
   
   // Check if user is at bottom of chat
   const checkIfAtBottom = () => {
@@ -202,6 +195,7 @@ export function MessageCenter() {
                 updatedAt: conversationData.updatedAt,
               };
               
+              // Then select the conversation
               handleSelectConversation(conversation);
               setMobileViewMode('chat');
             }
@@ -280,16 +274,7 @@ export function MessageCenter() {
   // Function to load messages for a conversation
   const loadMessages = async (conversationId: string) => {
     try {
-      // Generate the conversation key for decryption
       if (!currentUser) return () => {}
-      
-      // Find the other user ID
-      const otherUserId = activeConversation?.otherUser?.id
-      if (!otherUserId) return () => {}
-      
-      // Generate the encryption key for this conversation
-      const key = await generateConversationKey(currentUser.id, otherUserId)
-      setConversationKey(key)
       
       // Get nested messages collection for this conversation
       const messagesRef = collection(db, `conversations/${conversationId}/messages`)
@@ -307,38 +292,13 @@ export function MessageCenter() {
           const messageData = doc.data()
           const messageText = messageData.message as string
           
-          try {
-            // Try to decrypt the message
-            let decryptedMessage = messageText
-            
-            // Only attempt to decrypt if it appears to be encrypted
-            if (messageText && messageText.length > 24 && key) {
-              try {
-                decryptedMessage = await decryptMessage(messageText, key)
-              } catch (error) {
-                console.error("Failed to decrypt message, showing as-is", error)
-                decryptedMessage = "🔒 Encrypted message"
-              }
-            }
-            
-            messagesData.push({
-              id: doc.id,
-              senderId: messageData.senderId as string,
-              message: decryptedMessage,
-              createdAt: messageData.createdAt as Timestamp | null,
-              isDecrypted: true
-            })
-          } catch (error) {
-            console.error("Error processing message:", error)
-            // Fall back to original message
-            messagesData.push({
-              id: doc.id,
-              senderId: messageData.senderId as string,
-              message: messageText || "Message unavailable",
-              createdAt: messageData.createdAt as Timestamp | null,
-              isDecrypted: false
-            })
-          }
+          // Add message directly without encryption/decryption
+          messagesData.push({
+            id: doc.id,
+            senderId: messageData.senderId as string,
+            message: messageText || "Message unavailable",
+            createdAt: messageData.createdAt as Timestamp | null
+          })
         }
         
         setMessages(messagesData)
@@ -357,13 +317,16 @@ export function MessageCenter() {
   
   // Function to handle selecting a conversation
   const handleSelectConversation = async (conversation: Conversation) => {
+    // First set the active conversation
     setActiveConversation(conversation)
     setMobileViewMode('chat')
     setAtBottom(true)
     
+    // Clear messages while loading
+    setMessages([])
+    
     // Load messages for this conversation
     const unsubscribe = await loadMessages(conversation.id)
-    
     return () => unsubscribe()
   }
   
@@ -372,19 +335,8 @@ export function MessageCenter() {
     if (!newMessage.trim() || !activeConversation || !currentUser) return
     
     try {
-      // Need to encrypt the message before sending
-      let messageToSend = newMessage
-      
-      // Encrypt if we have a key
-      if (conversationKey) {
-        try {
-          messageToSend = await encryptMessage(newMessage, conversationKey)
-        } catch (error) {
-          console.error("Failed to encrypt message", error)
-          toast.error("Failed to encrypt message")
-          return
-        }
-      }
+      // Send message as plain text without encryption
+      const messageToSend = newMessage
       
       // Add message to the nested messages collection
       const messageRef = collection(db, `conversations/${activeConversation.id}/messages`)
@@ -394,7 +346,7 @@ export function MessageCenter() {
         createdAt: serverTimestamp(),
       })
       
-      // Update the conversation with the last message (plaintext for preview)
+      // Update the conversation with the last message
       await setDoc(doc(db, "conversations", activeConversation.id), {
         userIds: activeConversation.userIds,
         lastMessage: newMessage.length > 30 ? newMessage.substring(0, 27) + "..." : newMessage,
@@ -734,9 +686,6 @@ export function MessageCenter() {
                           }`}>
                             <p className="break-words whitespace-normal overflow-hidden">
                               {message.message}
-                              {!message.isDecrypted && (
-                                <span className="ml-1 text-xs opacity-70">🔒</span>
-                              )}
                             </p>
                             <div className={`text-xs mt-1 ${isCurrentUser ? 'text-purple-200' : 'text-zinc-400'}`}>
                               {message.createdAt ? 
