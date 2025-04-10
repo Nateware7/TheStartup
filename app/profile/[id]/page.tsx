@@ -4,7 +4,7 @@ import { useEffect, useState, cache } from "react"
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Star, MessageCircle, Calendar, Award, Loader, Edit, ExternalLink } from "lucide-react"
+import { Star, MessageCircle, Calendar, Award, Loader, Edit, ExternalLink, ShoppingBag } from "lucide-react"
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -13,7 +13,7 @@ import { UserReviews } from "@/components/user-reviews"
 import { AnimatedBackground } from "@/components/animated-background"
 import { MessageButton } from "@/components/message-button"
 import { db, auth } from "@/lib/firebaseConfig"
-import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore"
+import { doc, getDoc, collection, getDocs, query, where, updateDoc } from "firebase/firestore"
 import { format } from "date-fns"
 import { useRouter } from "next/navigation"
 import toast from "react-hot-toast"
@@ -42,6 +42,7 @@ function UserProfileContent({ userId }: { userId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("products")
   const [isCurrentUser, setIsCurrentUser] = useState(false)
+  const [salesCount, setSalesCount] = useState(0)
 
   useEffect(() => {
     // Check if the profile being viewed belongs to the current user
@@ -57,6 +58,7 @@ function UserProfileContent({ userId }: { userId: string }) {
         
         // First try to get user by UID
         const userDoc = await getDoc(doc(db, 'users', userId))
+        let actualUserId = userId;
         
         if (userDoc.exists()) {
           const userData = userDoc.data()
@@ -90,6 +92,21 @@ function UserProfileContent({ userId }: { userId: string }) {
             // Continue with the original rating if there's an error
           }
           
+          // Calculate sales by getting listings that are sold
+          try {
+            const listingsRef = collection(db, "listings")
+            const q = query(
+              listingsRef,
+              where("sellerId", "==", userId),
+              where("status", "==", "sold")
+            )
+            const soldListingsSnapshot = await getDocs(q)
+            const soldCount = soldListingsSnapshot.size
+            setSalesCount(soldCount)
+          } catch (error) {
+            console.error("Error counting sold items:", error)
+          }
+          
           setUser({
             id: userDoc.id,
             username: userData.username || "Anonymous",
@@ -99,7 +116,7 @@ function UserProfileContent({ userId }: { userId: string }) {
             isVerified: userData.isVerified || false,
             createdAt,
             location: userData.location || "Unknown location",
-            sales: userData.sales || 0,
+            sales: userData.sales || 0, // Keep this as fallback
             followers: userData.followers || 0,
             following: userData.following || 0,
             rating: userRating,
@@ -114,6 +131,7 @@ function UserProfileContent({ userId }: { userId: string }) {
           const querySnapshot = await getDocs(q)
           
           if (!querySnapshot.empty) {
+            actualUserId = querySnapshot.docs[0].id;
             const userData = querySnapshot.docs[0].data()
             
             // Map badge names to icons
@@ -145,6 +163,21 @@ function UserProfileContent({ userId }: { userId: string }) {
               // Continue with the original rating if there's an error
             }
             
+            // Calculate sales by getting listings that are sold
+            try {
+              const listingsRef = collection(db, "listings")
+              const q = query(
+                listingsRef,
+                where("sellerId", "==", querySnapshot.docs[0].id),
+                where("status", "==", "sold")
+              )
+              const soldListingsSnapshot = await getDocs(q)
+              const soldCount = soldListingsSnapshot.size
+              setSalesCount(soldCount)
+            } catch (error) {
+              console.error("Error counting sold items:", error)
+            }
+            
             setUser({
               id: querySnapshot.docs[0].id,
               username: userData.username || "Anonymous",
@@ -154,7 +187,7 @@ function UserProfileContent({ userId }: { userId: string }) {
               isVerified: userData.isVerified || false,
               createdAt,
               location: userData.location || "Unknown location",
-              sales: userData.sales || 0,
+              sales: userData.sales || 0, // Keep this as fallback
               followers: userData.followers || 0,
               following: userData.following || 0,
               rating: userRating,
@@ -171,6 +204,17 @@ function UserProfileContent({ userId }: { userId: string }) {
           } else {
             setError("User not found")
             toast.error("User not found")
+          }
+        }
+        
+        // Update user's sales count in Firestore if it's different
+        if (user && salesCount !== user.sales) {
+          try {
+            await updateDoc(doc(db, 'users', actualUserId), {
+              sales: salesCount
+            });
+          } catch (error) {
+            console.error("Error updating user sales count:", error);
           }
         }
       } catch (err) {
@@ -297,7 +341,7 @@ function UserProfileContent({ userId }: { userId: string }) {
                   {/* Stats */}
                   <div className="w-full grid grid-cols-2 gap-2">
                     <div className="rounded-lg bg-zinc-800/50 p-3 text-center">
-                      <div className="text-lg font-bold">{user.sales}</div>
+                      <div className="text-lg font-bold">{salesCount}</div>
                       <div className="text-xs text-zinc-400">Sales</div>
                     </div>
                     <div className="rounded-lg bg-zinc-800/50 p-3 text-center">
@@ -316,6 +360,18 @@ function UserProfileContent({ userId }: { userId: string }) {
                         {user.rating.toFixed(1)}
                       </div>
                       <div className="text-xs text-zinc-400">Rating</div>
+                    </div>
+                  </div>
+
+                  {/* Highlighted Sales Info */}
+                  <div className="w-full mt-4">
+                    <div className="rounded-lg bg-gradient-to-r from-blue-500/20 to-violet-500/20 border border-blue-500/30 p-4 text-center">
+                      <div className="flex items-center justify-center mb-2">
+                        <ShoppingBag className="h-5 w-5 mr-2 text-blue-400" />
+                        <span className="font-semibold text-blue-300">Total Sales</span>
+                      </div>
+                      <div className="text-2xl font-bold text-white">{salesCount}</div>
+                      <div className="text-xs text-blue-300 mt-1">Products successfully sold</div>
                     </div>
                   </div>
                 </div>
