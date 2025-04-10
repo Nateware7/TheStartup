@@ -14,7 +14,7 @@ import { db, auth } from "@/lib/firebaseConfig"
 import { usePathname } from "next/navigation"
 import { format } from "date-fns"
 import { AuctionCompletion } from "@/components/auction-completion"
-import { checkAndUpdateAuctionStatus } from "@/lib/auction"
+import { checkAndUpdateAuctionStatus, updateUserRating } from "@/lib/auction"
 import { toast } from "sonner"
 import { AuctionTimer } from "@/components/auction-timer"
 import { StarRating } from "@/components/star-rating"
@@ -581,39 +581,47 @@ export default function ProductPage() {
                               });
                               
                               // Update the listing in Firestore
-                              updateDoc(doc(db, "listings", product.id), {
-                                hasBeenRated: true
-                              }).catch((error) => {
-                                console.error("Error updating hasBeenRated:", error);
-                              });
-                              
-                              // Fetch the updated rating from userRatings collection after a short delay
-                              // to give time for the rating to be calculated and stored
-                              setTimeout(async () => {
-                                try {
-                                  const ratingDoc = await getDoc(doc(db, "userRatings", product.seller.id));
-                                  if (ratingDoc.exists()) {
-                                    const ratingData = ratingDoc.data();
+                              try {
+                                updateDoc(doc(db, "listings", product.id), {
+                                  hasBeenRated: true
+                                }).catch((error) => {
+                                  console.error("Error updating hasBeenRated:", error);
+                                });
+                                
+                                // Directly update the user's rating
+                                (async () => {
+                                  try {
+                                    // First call our updateUserRating function
+                                    await updateUserRating(product.seller.id);
+                                    console.log("Successfully updated user rating directly");
                                     
-                                    // Update the product state with the new rating
-                                    setProduct(prev => {
-                                      if (!prev) return null;
+                                    // Then fetch the updated rating
+                                    const ratingDoc = await getDoc(doc(db, "userRatings", product.seller.id));
+                                    if (ratingDoc.exists()) {
+                                      const ratingData = ratingDoc.data();
                                       
-                                      const updatedSeller = {
-                                        ...prev.seller,
-                                        rating: ratingData.rating || prev.seller.rating
-                                      };
-                                      
-                                      return {
-                                        ...prev,
-                                        seller: updatedSeller
-                                      };
-                                    });
+                                      // Update the product state with the new rating
+                                      setProduct(prev => {
+                                        if (!prev) return null;
+                                        
+                                        const updatedSeller = {
+                                          ...prev.seller,
+                                          rating: ratingData.rating || prev.seller.rating
+                                        };
+                                        
+                                        return {
+                                          ...prev,
+                                          seller: updatedSeller
+                                        };
+                                      });
+                                    }
+                                  } catch (error) {
+                                    console.error("Error updating/fetching rating:", error);
                                   }
-                                } catch (error) {
-                                  console.error("Error fetching updated rating:", error);
-                                }
-                              }, 1500); // Wait 1.5 seconds before checking for the updated rating
+                                })();
+                              } catch (error) {
+                                console.error("Error in rating submission handler:", error);
+                              }
                             }}
                           />
                         )}

@@ -281,8 +281,14 @@ export async function saveRating(
       await setDoc(doc(db, "ratings", ratingId), ratingData);
       console.log("Successfully created rating document");
       
-      // No need to manually update user rating - the Cloud Function will handle it
-      // The Cloud Function will trigger automatically when the rating document is created
+      // Manually update the user's rating - this ensures it works even if Cloud Function fails
+      try {
+        await updateUserRating(targetId);
+        console.log("Successfully updated user's average rating");
+      } catch (ratingUpdateError) {
+        console.error("Error updating user's average rating:", ratingUpdateError);
+        // Continue even if rating update fails - at least we saved the rating
+      }
       
       return true;
     } catch (error) {
@@ -301,7 +307,7 @@ export async function saveRating(
  * Update a user's average rating based on all their received ratings
  * @param userId The ID of the user to update
  */
-async function updateUserRating(userId: string): Promise<void> {
+export async function updateUserRating(userId: string): Promise<void> {
   try {
     console.log(`Updating average rating for user ${userId}`);
     
