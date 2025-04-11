@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { auth } from "@/lib/firebaseConfig"
 import { onAuthStateChanged, signOut, User as FirebaseUser } from "firebase/auth"
+import { NotificationBell } from "@/components/notification-bell"
 
 export function Navbar() {
   const pathname = usePathname()
@@ -114,7 +115,12 @@ export function Navbar() {
             </nav>
           </div>
 
-          <div className="flex items-center space-2">
+          <div className="flex items-center space-x-2">
+            {/* Notification Bell - only shown when logged in */}
+            {!isLoading && user && (
+              <NotificationBell />
+            )}
+            
             {/* User Profile Link - only shown when logged in */}
             {!isLoading && user && (
               <TooltipProvider>
@@ -256,31 +262,41 @@ export function Navbar() {
                 </Link>
               </li>
               
-              {isLoading ? (
-                <li className="pt-4">
-                  <div className="h-10 w-full animate-pulse rounded-md bg-zinc-800/50"></div>
-                </li>
-              ) : !user ? (
+              {/* Auth buttons for mobile */}
+              {!user ? (
                 <>
-                  <li className="pt-4">
-                    <Link href="/auth/signin" onClick={() => setIsMobileMenuOpen(false)}>
-                      <Button className="w-full" variant={pathname === "/auth/signin" ? "default" : "outline"}>
-                        Sign In
-                      </Button>
+                  <li>
+                    <Link
+                      href="/auth/signin"
+                      className="flex items-center text-xl font-medium text-white"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <User className="mr-2 h-5 w-5" />
+                      Sign In
                     </Link>
                   </li>
                   <li>
-                    <Link href="/auth/signup" onClick={() => setIsMobileMenuOpen(false)}>
-                      <Button className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white">Sign Up</Button>
+                    <Link
+                      href="/auth/signup"
+                      className="flex items-center text-xl font-medium text-white"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      Sign Up
                     </Link>
                   </li>
                 </>
               ) : (
-                <li className="pt-4">
-                  <Button className="w-full" variant="outline" onClick={handleSignOut}>
+                <li>
+                  <button
+                    className="flex items-center text-xl font-medium text-white"
+                    onClick={() => {
+                      handleSignOut()
+                      setIsMobileMenuOpen(false)
+                    }}
+                  >
                     <LogOut className="mr-2 h-5 w-5" />
                     Sign Out
-                  </Button>
+                  </button>
                 </li>
               )}
             </ul>

@@ -1,5 +1,6 @@
 import { Timestamp, doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig';
+import { handleAuctionEndNotifications } from './auction-notification-utils';
 
 /**
  * Check if a listing's auction has ended and update its status
@@ -141,6 +142,9 @@ export async function checkAndUpdateAuctionStatus(listingId: string): Promise<bo
         winnerConfirmed: false
       }
     });
+    
+    // Send notifications to the seller and winner
+    await handleAuctionEndNotifications(listingId);
     
     console.log(`Auction for listing ${listingId} marked as complete`);
     return true;

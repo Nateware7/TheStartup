@@ -20,6 +20,7 @@ import { AuctionTimer } from "@/components/auction-timer"
 import { StarRating } from "@/components/star-rating"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
+import { handleBidNotifications } from "@/lib/bid-notification-utils"
 
 // NOTE: This component directly accesses params.id which will show warnings in the console
 // In a future version of Next.js, params will need to be unwrapped with React.use()
@@ -250,6 +251,9 @@ export default function ProductPage() {
           ...(product.auctionLog || []).map(log => ({...log, isLeading: false}))
         ]
       });
+      
+      // Send notifications to relevant parties
+      await handleBidNotifications(product.id, currentUser.uid, bidAmount);
       
       setProduct((prev) => prev && { 
         ...prev, 

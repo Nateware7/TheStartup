@@ -39,6 +39,7 @@ import {
   encryptMessage, 
   decryptMessage 
 } from "@/lib/encryption"
+import { handleMessageNotification } from "@/lib/message-notification-utils"
 
 // Define TypeScript interfaces
 interface UserInfo {
@@ -707,6 +708,14 @@ export function MessageCenter() {
         lastMessage: messagePreview.length > 30 ? messagePreview.substring(0, 27) + "..." : messagePreview,
         updatedAt: serverTimestamp()
       }, { merge: true });
+      
+      // Send notification to the other user
+      await handleMessageNotification(
+        otherUserId,
+        currentUser.id,
+        messagePreview,
+        activeConversation.id
+      );
       
       // Clear the input field and reply state
       setNewMessage("");
