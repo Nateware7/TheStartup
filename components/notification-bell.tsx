@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { Bell } from "lucide-react"
@@ -17,6 +17,9 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Timestamp } from "firebase/firestore"
 import { useNotifications } from "@/hooks/use-notifications"
+import Image from "next/image"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebaseConfig"
 
 const getNotificationIcon = (type: string) => {
   switch (type) {
@@ -37,6 +40,61 @@ const getNotificationIcon = (type: string) => {
     default:
       return '🔔'
   }
+}
+
+// Add a new component to display user avatars
+function UserAvatar({ userId, type }: { userId: string, type: string }) {
+  const [avatar, setAvatar] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  
+  useEffect(() => {
+    const fetchUserAvatar = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, "users", userId))
+        if (userDoc.exists()) {
+          const userData = userDoc.data()
+          setAvatar(userData.profilePicture || userData.avatar || null)
+        }
+      } catch (error) {
+        console.error("Error fetching user avatar:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    if (userId) {
+      fetchUserAvatar()
+    } else {
+      setLoading(false)
+    }
+  }, [userId])
+  
+  if (loading) {
+    return (
+      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800">
+        <span className="animate-pulse">...</span>
+      </div>
+    )
+  }
+  
+  if (avatar) {
+    return (
+      <div className="relative h-8 w-8 overflow-hidden rounded-full">
+        <Image
+          src={avatar}
+          alt="User avatar"
+          fill
+          className="object-cover"
+        />
+      </div>
+    )
+  }
+  
+  return (
+    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800">
+      <span>{getNotificationIcon(type)}</span>
+    </div>
+  )
 }
 
 export function NotificationBell() {
@@ -112,9 +170,13 @@ export function NotificationBell() {
                   onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800">
-                      <span>{getNotificationIcon(notification.type)}</span>
-                    </div>
+                    {notification.type === 'message' && notification.fromUserId ? (
+                      <UserAvatar userId={notification.fromUserId} type={notification.type} />
+                    ) : (
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800">
+                        <span>{getNotificationIcon(notification.type)}</span>
+                      </div>
+                    )}
                     <div className="flex-1">
                       <p className="font-medium text-white">{notification.title}</p>
                       <p className="text-sm text-zinc-400">{notification.description}</p>

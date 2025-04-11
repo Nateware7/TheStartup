@@ -81,7 +81,7 @@ export async function createBidNotification(
     type: 'bid',
     title: 'New Bid Placed',
     description: `A new bid of $${bidAmount.toFixed(2)} was placed on "${itemTitle}"`,
-    link: `/marketplace/${listingId}`,
+    link: `/product/${listingId}`,
     fromUserId: bidderId,
     relatedItemId: listingId
   });
@@ -102,7 +102,7 @@ export async function createOutbidNotification(
     type: 'outbid',
     title: 'You\'ve Been Outbid',
     description: `Someone placed a new bid of $${newBidAmount.toFixed(2)} on "${itemTitle}", which is higher than your previous bid`,
-    link: `/marketplace/${listingId}`,
+    link: `/product/${listingId}`,
     fromUserId: newBidderId,
     relatedItemId: listingId
   });
@@ -131,7 +131,7 @@ export async function createAuctionEndedSellerNotification(
     type: 'auction-ended',
     title,
     description,
-    link: `/marketplace/${listingId}`,
+    link: `/product/${listingId}`,
     fromUserId: winnerId || undefined,
     relatedItemId: listingId
   });
@@ -152,7 +152,7 @@ export async function createAuctionWonNotification(
     type: 'auction-won',
     title: 'You Won an Auction!',
     description: `Congratulations! You won the auction for "${itemTitle}" with a bid of $${winningBid.toFixed(2)}. Please contact the seller to arrange the transaction.`,
-    link: `/marketplace/${listingId}`,
+    link: `/product/${listingId}`,
     fromUserId: sellerId,
     relatedItemId: listingId
   });
@@ -165,12 +165,15 @@ export async function createMessageNotification(
   recipientId: string,
   senderId: string,
   messageContent: string,
-  conversationId: string
+  conversationId: string,
+  senderName?: string
 ): Promise<string> {
+  const title = senderName ? `New Message from ${senderName}` : 'New Message';
+  
   return createNotification({
     userId: recipientId,
     type: 'message',
-    title: 'New Message',
+    title,
     description: messageContent.length > 100 
       ? `${messageContent.substring(0, 100)}...` 
       : messageContent,

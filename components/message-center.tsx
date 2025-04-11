@@ -714,7 +714,8 @@ export function MessageCenter() {
         otherUserId,
         currentUser.id,
         messagePreview,
-        activeConversation.id
+        activeConversation.id,
+        currentUser.username
       );
       
       // Clear the input field and reply state

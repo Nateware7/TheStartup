@@ -37,6 +37,8 @@ import {
 import { auth } from "@/lib/firebaseConfig"
 import { User } from "firebase/auth"
 import { Timestamp } from "firebase/firestore"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebaseConfig"
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -164,6 +166,61 @@ export default function NotificationsPage() {
     { value: "transaction-confirmed", label: "Confirmations" },
   ]
 
+  // Add a UserAvatar component similar to the notification bell
+  function UserAvatar({ userId, type }: { userId: string, type: NotificationType }) {
+    const [avatar, setAvatar] = useState<string | null>(null)
+    const [loading, setLoading] = useState(true)
+    
+    useEffect(() => {
+      const fetchUserAvatar = async () => {
+        try {
+          const userDoc = await getDoc(doc(db, "users", userId))
+          if (userDoc.exists()) {
+            const userData = userDoc.data()
+            setAvatar(userData.profilePicture || userData.avatar || null)
+          }
+        } catch (error) {
+          console.error("Error fetching user avatar:", error)
+        } finally {
+          setLoading(false)
+        }
+      }
+      
+      if (userId) {
+        fetchUserAvatar()
+      } else {
+        setLoading(false)
+      }
+    }, [userId])
+    
+    if (loading) {
+      return (
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800">
+          <span className="animate-pulse">...</span>
+        </div>
+      )
+    }
+    
+    if (avatar) {
+      return (
+        <div className="relative h-10 w-10 overflow-hidden rounded-full">
+          <Image
+            src={avatar}
+            alt="User avatar"
+            fill
+            className="object-cover"
+          />
+        </div>
+      )
+    }
+    
+    return (
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800">
+        <span>{getNotificationIcon(type)}</span>
+      </div>
+    )
+  }
+
   // Loading state
   if (isLoading) {
     return (
@@ -237,9 +294,13 @@ export default function NotificationsPage() {
                   onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`p-2.5 rounded-full ${notification.read ? 'bg-zinc-800' : 'bg-zinc-700'}`}>
-                      {getNotificationIcon(notification.type)}
-                    </div>
+                    {notification.type === 'message' && notification.fromUserId ? (
+                      <UserAvatar userId={notification.fromUserId} type={notification.type} />
+                    ) : (
+                      <div className={`p-2.5 rounded-full ${notification.read ? 'bg-zinc-800' : 'bg-zinc-700'}`}>
+                        {getNotificationIcon(notification.type)}
+                      </div>
+                    )}
                     <div className="flex-1">
                       <h3 className="text-lg font-medium">{notification.title}</h3>
                       <p className="text-zinc-400 mt-1">{notification.description}</p>
@@ -277,9 +338,13 @@ export default function NotificationsPage() {
                     onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="p-2.5 rounded-full bg-zinc-700">
-                        {getNotificationIcon(notification.type)}
-                      </div>
+                      {notification.type === 'message' && notification.fromUserId ? (
+                        <UserAvatar userId={notification.fromUserId} type={notification.type} />
+                      ) : (
+                        <div className="p-2.5 rounded-full bg-zinc-700">
+                          {getNotificationIcon(notification.type)}
+                        </div>
+                      )}
                       <div className="flex-1">
                         <h3 className="text-lg font-medium">{notification.title}</h3>
                         <p className="text-zinc-400 mt-1">{notification.description}</p>
