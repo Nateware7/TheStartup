@@ -275,122 +275,158 @@ export function MessageCenter() {
     }
   }
   
-  // Function to load messages for a conversation
-  const loadMessages = async (conversationId: string) => {
+  // Function to handle selecting a conversation
+  const handleSelectConversation = async (conversation: Conversation) => {
+    // First set the active conversation and clear any previous messages
+    setActiveConversation(conversation);
+    setMobileViewMode('chat');
+    setAtBottom(true);
+    setMessages([]);
+    
+    // Store key conversation data in a local variable to ensure it's available for the loadMessages function
+    const selectedConversation = {
+      id: conversation.id,
+      otherUserId: conversation.otherUser?.id || ''
+    };
+    
+    // Load messages directly with the necessary conversation data instead of relying on state
+    if (currentUser && selectedConversation.id && selectedConversation.otherUserId) {
+      const unsubscribe = await loadMessagesWithUserIds(
+        selectedConversation.id, 
+        currentUser.id, 
+        selectedConversation.otherUserId
+      );
+      // We could store this unsubscribe function if needed
+    }
+  };
+  
+  // New function that loads and decrypts messages with explicit user IDs
+  const loadMessagesWithUserIds = async (conversationId: string, currentUserId: string, otherUserId: string) => {
     try {
-      if (!currentUser) return () => {}
+      if (!currentUserId || !otherUserId) return () => {};
       
       // Get nested messages collection for this conversation
-      const messagesRef = collection(db, `conversations/${conversationId}/messages`)
+      const messagesRef = collection(db, `conversations/${conversationId}/messages`);
       const messagesQuery = query(
         messagesRef,
         orderBy("createdAt", "asc")
-      )
+      );
       
       // Set up real-time listener for messages
       const unsubscribe = onSnapshot(messagesQuery, async (querySnapshot) => {
-        const messagesData: Message[] = []
+        const messagesData: Message[] = [];
         
         // Process each message
         for (const doc of querySnapshot.docs) {
-          const messageData = doc.data()
-          const messageText = messageData.message as string
+          const messageData = doc.data();
+          const messageText = messageData.message as string;
           
           try {
-            // Decrypt the message
-            const decryptedMessage = decryptMessage(messageText)
+            // Decrypt with the explicit user IDs we passed in
+            const decryptedMessage = decryptMessage(
+              messageText, 
+              currentUserId,
+              otherUserId
+            );
             
             messagesData.push({
               id: doc.id,
               senderId: messageData.senderId as string,
               message: decryptedMessage,
               createdAt: messageData.createdAt as Timestamp | null
-            })
+            });
           } catch (error) {
-            console.error("Error processing message:", error)
+            console.error("Error processing message:", error);
             // Fall back to original message
             messagesData.push({
               id: doc.id,
               senderId: messageData.senderId as string,
               message: "[Message could not be decrypted]",
               createdAt: messageData.createdAt as Timestamp | null
-            })
+            });
           }
         }
         
-        setMessages(messagesData)
+        setMessages(messagesData);
       }, (error) => {
-        console.error("Error in messages snapshot listener:", error)
-        toast.error("Failed to load messages. Please try again.")
-      })
+        console.error("Error in messages snapshot listener:", error);
+        toast.error("Failed to load messages. Please try again.");
+      });
       
-      return unsubscribe
+      return unsubscribe;
     } catch (error) {
-      console.error("Error loading messages:", error)
-      toast.error("Failed to load messages")
-      return () => {}
+      console.error("Error loading messages:", error);
+      toast.error("Failed to load messages");
+      return () => {};
     }
-  }
+  };
   
-  // Function to handle selecting a conversation
-  const handleSelectConversation = async (conversation: Conversation) => {
-    // First set the active conversation
-    setActiveConversation(conversation)
-    setMobileViewMode('chat')
-    setAtBottom(true)
+  // Keep the original loadMessages function for backward compatibility
+  const loadMessages = async (conversationId: string) => {
+    if (!currentUser || !activeConversation?.otherUser?.id) return () => {};
     
-    // Clear messages while loading
-    setMessages([])
-    
-    // Load messages for this conversation
-    const unsubscribe = await loadMessages(conversation.id)
-    return () => unsubscribe()
-  }
+    return loadMessagesWithUserIds(
+      conversationId,
+      currentUser.id,
+      activeConversation.otherUser.id
+    );
+  };
   
   // Function to send a new message
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !activeConversation || !currentUser) return
     
     try {
-      // Encrypt the message before sending
-      const messageToSend = encryptMessage(newMessage)
-      const messagePreview = newMessage
+      // Make sure we have the other user's ID
+      const otherUserId = activeConversation.otherUser?.id;
+      if (!otherUserId) {
+        toast.error("Cannot send message: recipient information missing");
+        return;
+      }
+      
+      // Encrypt the message with end-to-end encryption using both user IDs
+      const messageToSend = encryptMessage(
+        newMessage, 
+        currentUser.id, 
+        otherUserId
+      );
+      const messagePreview = newMessage;
       
       // Add message to the nested messages collection
-      const messageRef = collection(db, `conversations/${activeConversation.id}/messages`)
+      const messageRef = collection(db, `conversations/${activeConversation.id}/messages`);
       await addDoc(messageRef, {
         senderId: currentUser.id,
         message: messageToSend,
         createdAt: serverTimestamp(),
-      })
+      });
       
       // Update the conversation with the last message (plain text for preview)
       await setDoc(doc(db, "conversations", activeConversation.id), {
         userIds: activeConversation.userIds,
         lastMessage: messagePreview.length > 30 ? messagePreview.substring(0, 27) + "..." : messagePreview,
         updatedAt: serverTimestamp()
-      }, { merge: true })
+      }, { merge: true });
       
       // Clear the input field
-      setNewMessage("")
+      setNewMessage("");
 
       // Ensure we're at the bottom after sending
-      setAtBottom(true)
+      setAtBottom(true);
       
       // Force scroll to bottom immediately
       if (messagesContainerRef.current) {
         setTimeout(() => {
-          const scrollableParent = messagesContainerRef.current?.parentElement
+          const scrollableParent = messagesContainerRef.current?.parentElement;
           if (scrollableParent) {
-            scrollableParent.scrollTop = scrollableParent.scrollHeight
+            scrollableParent.scrollTop = scrollableParent.scrollHeight;
           }
-        }, 100)
+        }, 100);
       }
     } catch (error) {
-      console.error("Error sending message:", error)
-      toast.error("Failed to send message")
+      console.error("Error sending message:", error);
+      toast.error("Failed to send message");
     }
-  }
+  };
   
   // Function to search for users
   const searchUsers = async (queryText: string) => {
