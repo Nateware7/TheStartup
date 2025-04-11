@@ -37,8 +37,7 @@ import {
 import toast from "react-hot-toast"
 import { 
   encryptMessage, 
-  decryptMessage, 
-  generateConversationKey 
+  decryptMessage 
 } from "@/lib/encryption"
 
 // Define TypeScript interfaces
@@ -81,7 +80,6 @@ export function MessageCenter() {
   const [searchResults, setSearchResults] = useState<UserInfo[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [atBottom, setAtBottom] = useState(true)
-  const [conversationKey, setConversationKey] = useState<string | null>(null)
   
   // Check if user is at bottom of chat
   const checkIfAtBottom = () => {
@@ -282,16 +280,6 @@ export function MessageCenter() {
     try {
       if (!currentUser) return () => {}
       
-      // Generate the encryption key for this conversation if not already set
-      if (!conversationKey && activeConversation?.otherUser) {
-        try {
-          const key = await generateConversationKey(currentUser.id, activeConversation.otherUser.id)
-          setConversationKey(key)
-        } catch (keyError) {
-          console.error("Failed to generate key:", keyError)
-        }
-      }
-      
       // Get nested messages collection for this conversation
       const messagesRef = collection(db, `conversations/${conversationId}/messages`)
       const messagesQuery = query(
@@ -309,12 +297,8 @@ export function MessageCenter() {
           const messageText = messageData.message as string
           
           try {
-            // Try to decrypt the message if we have a key
-            let decryptedMessage = messageText
-            
-            if (conversationKey) {
-              decryptedMessage = await decryptMessage(messageText, conversationKey)
-            }
+            // Decrypt the message
+            const decryptedMessage = decryptMessage(messageText)
             
             messagesData.push({
               id: doc.id,
@@ -328,7 +312,7 @@ export function MessageCenter() {
             messagesData.push({
               id: doc.id,
               senderId: messageData.senderId as string,
-              message: messageText || "Message unavailable",
+              message: "[Message could not be decrypted]",
               createdAt: messageData.createdAt as Timestamp | null
             })
           }
@@ -355,16 +339,6 @@ export function MessageCenter() {
     setMobileViewMode('chat')
     setAtBottom(true)
     
-    // Generate key for this conversation
-    if (currentUser && conversation.otherUser) {
-      try {
-        const key = await generateConversationKey(currentUser.id, conversation.otherUser.id)
-        setConversationKey(key)
-      } catch (error) {
-        console.error("Error generating conversation key:", error)
-      }
-    }
-    
     // Clear messages while loading
     setMessages([])
     
@@ -378,18 +352,9 @@ export function MessageCenter() {
     if (!newMessage.trim() || !activeConversation || !currentUser) return
     
     try {
-      // Encrypt the message before sending if we have a key
-      let messageToSend = newMessage
-      let messagePreview = newMessage
-      
-      if (conversationKey) {
-        try {
-          messageToSend = await encryptMessage(newMessage, conversationKey)
-        } catch (error) {
-          console.error("Failed to encrypt message:", error)
-          // Continue with unencrypted message if encryption fails
-        }
-      }
+      // Encrypt the message before sending
+      const messageToSend = encryptMessage(newMessage)
+      const messagePreview = newMessage
       
       // Add message to the nested messages collection
       const messageRef = collection(db, `conversations/${activeConversation.id}/messages`)
