@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link"
-import { ArrowLeft, CheckCircle, Share2, MessageCircle } from "lucide-react"
+import { ArrowLeft, CheckCircle, Share2, MessageCircle, ShoppingBag } from "lucide-react"
 import { Navbar } from "@/components/navbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AnimatedBackground } from "@/components/animated-background"
@@ -9,16 +9,15 @@ import { AuctionLog } from "@/components/auction-log"
 import { MessageButton } from "@/components/message-button"
 import { ProductTimer, isTimerExpired } from "@/components/product-timer"
 import { useState, useEffect } from "react"
-import { doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore"
+import { doc, getDoc, updateDoc, onSnapshot, collection, query, where, getDocs } from "firebase/firestore"
 import { db, auth } from "@/lib/firebaseConfig"
 import { usePathname } from "next/navigation"
 import { format } from "date-fns"
 import { AuctionCompletion } from "@/components/auction-completion"
-import { checkAndUpdateAuctionStatus, updateUserRating } from "@/lib/auction"
+import { checkAndUpdateAuctionStatus } from "@/lib/auction"
 import { toast } from "sonner"
 import { AuctionTimer } from "@/components/auction-timer"
 import { StarRating } from "@/components/star-rating"
-import { RateSellerButton } from "@/components/rate-seller-button"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 
@@ -136,6 +135,21 @@ export default function ProductPage() {
                   // Continue with the original rating if there's an error
                 }
                 
+                // Calculate sales by getting listings that are sold
+                let salesCount = sellerData.sales || 0;
+                try {
+                  const listingsRef = collection(db, "listings");
+                  const q = query(
+                    listingsRef,
+                    where("sellerId", "==", data.sellerId),
+                    where("status", "==", "sold")
+                  );
+                  const soldListingsSnapshot = await getDocs(q);
+                  salesCount = soldListingsSnapshot.size;
+                } catch (error) {
+                  console.error("Error counting sold items:", error);
+                }
+                
                 sellerInfo = {
                   id: data.sellerId,
                   name: sellerData.username || sellerData.displayName || "Anonymous",
@@ -143,7 +157,7 @@ export default function ProductPage() {
                   avatar: sellerData.profilePicture || sellerData.photoURL || "/placeholder.svg?height=200&width=200",
                   verified: sellerData.isVerified || false,
                   joinDate: sellerData.createdAt ? format(sellerData.createdAt.toDate(), 'MMMM yyyy') : "Unknown",
-                  sales: sellerData.sales || 0,
+                  sales: salesCount,
                   rating: sellerRating,
                 };
               }
@@ -561,9 +575,19 @@ export default function ProductPage() {
                       <span className="text-zinc-500">Member since:</span>
                       <span className="text-zinc-300">{product.seller.joinDate}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-zinc-500">Sales:</span>
-                      <span className="text-zinc-300">{product.seller.sales} products</span>
+                      <span 
+                        className="text-zinc-300 flex items-center"
+                        title={product.seller.sales > 0 ? 
+                          `This seller has successfully completed ${product.seller.sales} ${product.seller.sales === 1 ? 'transaction' : 'transactions'}`
+                          : 'This seller has not completed any sales yet'}
+                      >
+                        <ShoppingBag className="h-3.5 w-3.5 mr-1 text-zinc-400" />
+                        {product.seller.sales > 0 ? 
+                          `${product.seller.sales} successful ${product.seller.sales === 1 ? 'sale' : 'sales'}` : 
+                          'No sales yet'}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-zinc-500">Rating:</span>
@@ -579,74 +603,12 @@ export default function ProductPage() {
                       </button>
                     </Link>
                     {auth.currentUser?.uid !== product.seller.id && (
-                      <>
-                        <MessageButton
-                          recipientId={product.seller.id}
-                          recipientName={product.seller.name}
-                          variant="outline"
-                          className="w-full border-zinc-700 text-white hover:bg-zinc-700"
-                        />
-                        {/* For auctions, only show rating button if auction is complete.
-                            For direct purchases, always show the rating option. */}
-                        {(product.isAuction === true ? product.isComplete : true) && (
-                          <RateSellerButton 
-                            sellerId={product.seller.id}
-                            listingId={product.id}
-                            className="w-full border-zinc-700 text-white hover:bg-zinc-700"
-                            hasBeenRated={product.hasBeenRated}
-                            onRatingSubmitted={(newRating) => {
-                              // Mark the product as rated
-                              setProduct(prev => {
-                                if (!prev) return null;
-                                return { ...prev, hasBeenRated: true };
-                              });
-                              
-                              // Update the listing in Firestore
-                              try {
-                                updateDoc(doc(db, "listings", product.id), {
-                                  hasBeenRated: true
-                                }).catch((error) => {
-                                  console.error("Error updating hasBeenRated:", error);
-                                });
-                                
-                                // Directly update the user's rating
-                                (async () => {
-                                  try {
-                                    // First call our updateUserRating function
-                                    await updateUserRating(product.seller.id);
-                                    console.log("Successfully updated user rating directly");
-                                    
-                                    // Then fetch the updated rating
-                                    const ratingDoc = await getDoc(doc(db, "userRatings", product.seller.id));
-                                    if (ratingDoc.exists()) {
-                                      const ratingData = ratingDoc.data();
-                                      
-                                      // Update the product state with the new rating
-                                      setProduct(prev => {
-                                        if (!prev) return null;
-                                        
-                                        const updatedSeller = {
-                                          ...prev.seller,
-                                          rating: ratingData.rating || prev.seller.rating
-                                        };
-                                        
-                                        return {
-                                          ...prev,
-                                          seller: updatedSeller
-                                        };
-                                      });
-                                    }
-                                  } catch (error) {
-                                    console.error("Error updating/fetching rating:", error);
-                                  }
-                                })();
-                              } catch (error) {
-                                console.error("Error in rating submission handler:", error);
-                              }
-                            }}
-                          />
-                        )}
-                      </>
+                      <MessageButton
+                        recipientId={product.seller.id}
+                        recipientName={product.seller.name}
+                        variant="outline"
+                        className="w-full border-zinc-700 text-white hover:bg-zinc-700"
+                      />
                     )}
                   </div>
                 </div>
