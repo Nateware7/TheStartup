@@ -31,16 +31,7 @@ const fixedPriceSchema = z.object({
   category: z.string().min(1, "Category is required"),
   assetType: z.string().min(1, "Asset type is required"),
   price: z.coerce.number().min(1, "Price must be at least 1"),
-  durationDays: z.coerce.number().min(0),
-  durationHours: z.coerce.number().min(0).max(23),
-  durationMinutes: z.coerce.number().min(0).max(59),
   status: z.string()
-}).refine((data) => {
-  const totalMinutes = (data.durationDays * 24 * 60) + (data.durationHours * 60) + data.durationMinutes;
-  return totalMinutes > 0;
-}, {
-  message: "Duration must be greater than zero",
-  path: ["durationDays"]
 });
 
 const auctionSchema = z.object({
@@ -81,9 +72,6 @@ export default function SellPage() {
       category: "insta",
       assetType: "username",
       price: 0,
-      durationDays: 0,
-      durationHours: 0,
-      durationMinutes: 0,
       status: "active"
     }
   })
@@ -129,11 +117,6 @@ export default function SellPage() {
 
     setIsLoading(true)
     try {
-      // Calculate expiration date based on duration
-      const totalMinutes = (data.durationDays * 24 * 60) + (data.durationHours * 60) + data.durationMinutes
-      const expirationDate = new Date()
-      expirationDate.setMinutes(expirationDate.getMinutes() + totalMinutes)
-      
       const listingData = {
         title: data.title,
         description: data.description,
@@ -141,15 +124,10 @@ export default function SellPage() {
         category: data.category,
         assetType: data.assetType,
         price: data.price,
-        durationDays: data.durationDays,
-        durationHours: data.durationHours,
-        durationMinutes: data.durationMinutes,
-        durationString: `${data.durationDays}d ${data.durationHours}h ${data.durationMinutes}m`,
         sellerId: userId,
         isAuction: false,
         status: data.status,
-        createdAt: serverTimestamp(),
-        expiresAt: Timestamp.fromDate(expirationDate)
+        createdAt: serverTimestamp()
       }
 
       // Add the document to Firestore
@@ -342,59 +320,6 @@ export default function SellPage() {
                         />
                         {fixedPriceForm.formState.errors.price && (
                           <p className="text-sm text-red-500">{fixedPriceForm.formState.errors.price.message}</p>
-                        )}
-                      </div>
-                      
-                      {/* Duration */}
-                      <div className="space-y-2">
-                        <Label htmlFor="fixed-duration">Listing Duration</Label>
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <Input
-                                id="fixed-durationDays"
-                                type="number"
-                                min="0"
-                                placeholder="0"
-                                {...fixedPriceForm.register("durationDays", { valueAsNumber: true })}
-                                className={`bg-zinc-800/50 border-zinc-700 focus:border-violet-500 ${
-                                  fixedPriceForm.formState.errors.durationDays ? "border-red-500" : ""
-                                }`}
-                              />
-                              <Label htmlFor="fixed-durationDays" className="whitespace-nowrap">Days</Label>
-                            </div>
-                          </div>
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <Input
-                                id="fixed-durationHours"
-                                type="number"
-                                min="0"
-                                max="23"
-                                placeholder="0"
-                                {...fixedPriceForm.register("durationHours", { valueAsNumber: true })}
-                                className="bg-zinc-800/50 border-zinc-700 focus:border-violet-500"
-                              />
-                              <Label htmlFor="fixed-durationHours" className="whitespace-nowrap">Hours</Label>
-                            </div>
-                          </div>
-                          <div>
-                            <div className="flex items-center space-x-2">
-                              <Input
-                                id="fixed-durationMinutes"
-                                type="number"
-                                min="0"
-                                max="59"
-                                placeholder="0"
-                                {...fixedPriceForm.register("durationMinutes", { valueAsNumber: true })}
-                                className="bg-zinc-800/50 border-zinc-700 focus:border-violet-500"
-                              />
-                              <Label htmlFor="fixed-durationMinutes" className="whitespace-nowrap">Min</Label>
-                            </div>
-                          </div>
-                        </div>
-                        {fixedPriceForm.formState.errors.durationDays && (
-                          <p className="text-sm text-red-500">{fixedPriceForm.formState.errors.durationDays.message}</p>
                         )}
                       </div>
                       

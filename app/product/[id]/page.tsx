@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link"
-import { ArrowLeft, CheckCircle, Share2 } from "lucide-react"
+import { ArrowLeft, CheckCircle, Share2, MessageCircle } from "lucide-react"
 import { Navbar } from "@/components/navbar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AnimatedBackground } from "@/components/animated-background"
@@ -19,6 +19,8 @@ import { toast } from "sonner"
 import { AuctionTimer } from "@/components/auction-timer"
 import { StarRating } from "@/components/star-rating"
 import { RateSellerButton } from "@/components/rate-seller-button"
+import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 
 // NOTE: This component directly accesses params.id which will show warnings in the console
 // In a future version of Next.js, params will need to be unwrapped with React.use()
@@ -62,6 +64,7 @@ interface Product {
     winnerConfirmed: boolean;
   };
   hasBeenRated?: boolean;
+  isAuction?: boolean;
 }
 
 export default function ProductPage() {
@@ -75,6 +78,8 @@ export default function ProductPage() {
   // Get the product ID from the pathname instead of params
   const pathname = usePathname();
   const productId = pathname ? pathname.split('/').pop() : '';
+
+  const router = useRouter();
 
   useEffect(() => {
     if (!productId) return;
@@ -173,6 +178,7 @@ export default function ProductPage() {
             highestBidderId: data.highestBidderId,
             confirmation: data.confirmation || { sellerConfirmed: false, winnerConfirmed: false },
             hasBeenRated: data.hasBeenRated || false,
+            isAuction: data.isAuction || false,
           });
         } else {
           setProduct(null);
@@ -351,8 +357,11 @@ export default function ProductPage() {
     );
   }
 
-  // Determine if this is an auction product
-  const isAuction = product.startingBid !== undefined && product.currentBid !== undefined;
+  console.log('Raw product data:', product);
+
+  // Force isAuction to be a boolean based on explicit isAuction flag
+  const isAuction = Boolean(product.isAuction);
+  console.log('Is this an auction?', isAuction);
 
   const getInitials = (name: string) => {
     return name
@@ -419,17 +428,6 @@ export default function ProductPage() {
                   </div>
                   <div className="text-xs text-zinc-500">{product.seller.handle}</div>
                 </div>
-                {auth.currentUser?.uid !== product.seller.id && (
-                  <div className="ml-2">
-                    <MessageButton
-                      recipientId={product.seller.id}
-                      recipientName={product.seller.name}
-                      variant="outline"
-                      size="sm"
-                      className="border-zinc-700 text-white hover:bg-zinc-700"
-                    />
-                  </div>
-                )}
               </div>
               <div className="flex items-center gap-2">
                 <div className="rounded-full bg-zinc-800/70 px-3 py-1 text-sm font-medium text-white">
@@ -459,7 +457,7 @@ export default function ProductPage() {
                 </div>
 
                 {/* Auction log for auction products - displayed directly below description */}
-                {isAuction && (
+                {product.isAuction === true && (
                   <div className="mt-6">
                     <h2 className="mb-4 text-xl font-semibold">Auction Activity</h2>
                     <AuctionLog auctionLog={product.auctionLog} />
@@ -467,7 +465,7 @@ export default function ProductPage() {
                 )}
 
                 {/* Add AuctionCompletion component */}
-                {product.isComplete && (
+                {product.isAuction === true && product.isComplete && (
                   <AuctionCompletion listingId={product.id} />
                 )}
               </div>
@@ -477,7 +475,7 @@ export default function ProductPage() {
                 {/* Price/Bid card */}
                 <div className="rounded-xl border border-zinc-800/60 bg-zinc-800/20 p-5 backdrop-blur-sm shadow-lg">
                   <div className="mb-4 flex items-end justify-between">
-                    {isAuction ? (
+                    {product.isAuction === true ? (
                       <>
                         <div>
                           <div className="text-sm text-zinc-500">Starting Price</div>
@@ -496,7 +494,7 @@ export default function ProductPage() {
                     )}
                   </div>
 
-                  {isAuction ? (
+                  {product.isAuction ? (
                     <div className="space-y-3">
                       {!product.isComplete && (
                         <div className="flex items-center gap-2">
@@ -530,9 +528,28 @@ export default function ProductPage() {
                       </div>
                     </div>
                   ) : (
-                    <button className="w-full rounded-md bg-gradient-to-r from-violet-500 to-indigo-500 px-4 py-2 font-medium text-white hover:from-violet-600 hover:to-indigo-600">
-                      Buy Now
-                    </button>
+                    <Button
+                      className="w-full bg-gradient-to-r from-violet-500 to-indigo-500 px-4 py-2 font-medium text-white hover:from-violet-600 hover:to-indigo-600"
+                      onClick={() => {
+                        const currentUser = auth.currentUser;
+                        if (!currentUser) {
+                          toast.error('You must be logged in to contact the seller');
+                          router.push('/auth/signin');
+                          return;
+                        }
+                        
+                        if (currentUser.uid === product.seller.id) {
+                          toast.error("You can't message yourself");
+                          return;
+                        }
+                        
+                        const conversationId = [currentUser.uid, product.seller.id].sort().join('_');
+                        router.push(`/messages?conversation=${conversationId}`);
+                      }}
+                    >
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Contact Seller
+                    </Button>
                   )}
                 </div>
 
@@ -571,7 +588,7 @@ export default function ProductPage() {
                         />
                         {/* For auctions, only show rating button if auction is complete.
                             For direct purchases, always show the rating option. */}
-                        {(isAuction ? product.isComplete : true) && (
+                        {(product.isAuction === true ? product.isComplete : true) && (
                           <RateSellerButton 
                             sellerId={product.seller.id}
                             listingId={product.id}
