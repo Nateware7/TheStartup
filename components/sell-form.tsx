@@ -55,9 +55,9 @@ export function SellForm() {
     bidIncrement: "",
     maxBid: "",
     duration: "",
-    durationDays: "0",
-    durationHours: "0",
-    durationMinutes: "0",
+    durationDays: "",
+    durationHours: "",
+    durationMinutes: "",
     ownershipConfirmed: false,
   })
   const [formErrors, setFormErrors] = useState<FormErrors>({})
@@ -65,11 +65,45 @@ export function SellForm() {
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type, checked } = e.target as HTMLInputElement;
+    
+    // Process numeric inputs
+    let processedValue = value;
+    
+    if (name === "price" || name === "startingBid" || name === "bidIncrement" || name === "maxBid" || 
+        name === "durationDays" || name === "durationHours" || name === "durationMinutes") {
+      
+      // Prevent non-numeric inputs (allow empty string and decimal point for price fields)
+      const isDecimalField = ["price", "startingBid", "bidIncrement", "maxBid"].includes(name);
+      const validPattern = isDecimalField ? /^(\d*\.?\d*)?$/ : /^(\d*)?$/;
+      
+      if (!validPattern.test(value)) {
+        return; // Reject invalid input
+      }
+      
+      // Remove leading zeros for whole numbers but keep decimal numbers like 0.xx
+      if (value.length > 1 && value.startsWith('0') && value.charAt(1) !== '.') {
+        processedValue = value.replace(/^0+/, '');
+      }
+    }
+    
     setFormData({
       ...formData,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: type === "checkbox" ? checked : processedValue,
     })
   }
+
+  // Handle input focus to clear zeros
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    
+    // For duration fields only
+    if ((name === "durationDays" || name === "durationHours" || name === "durationMinutes") && value === "0") {
+      setFormData({
+        ...formData,
+        [name]: "",
+      });
+    }
+  };
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData({
@@ -98,16 +132,22 @@ export function SellForm() {
     }
 
     // Price validation
-    if (!isAuction && (!formData.price || Number.parseFloat(formData.price) <= 0)) {
-      errors.price = "Valid price is required"
+    if (!isAuction) {
+      const price = parseFloat(formData.price)
+      if (!formData.price || isNaN(price) || price <= 0) {
+        errors.price = "Valid price is required"
+      }
     }
 
     // Auction validation
     if (isAuction) {
-      if (!formData.startingBid || Number.parseFloat(formData.startingBid) <= 0) {
+      const startingBid = parseFloat(formData.startingBid)
+      const bidIncrement = parseFloat(formData.bidIncrement)
+      
+      if (!formData.startingBid || isNaN(startingBid) || startingBid <= 0) {
         errors.startingBid = "Valid starting bid is required"
       }
-      if (!formData.bidIncrement || Number.parseFloat(formData.bidIncrement) <= 0) {
+      if (!formData.bidIncrement || isNaN(bidIncrement) || bidIncrement <= 0) {
         errors.bidIncrement = "Valid bid increment is required"
       }
     }
@@ -326,10 +366,11 @@ export function SellForm() {
                           <Input
                             id="price"
                             name="price"
-                            type="number"
-                            step="0.01"
-                            min="0"
+                            type="text"
+                            pattern="[0-9]*\.?[0-9]*"
+                            inputMode="decimal"
                             value={formData.price}
+                            defaultValue=""
                             onChange={handleInputChange}
                             className={`pl-8 border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500 ${
                               formErrors?.price ? "border-red-500" : ""
@@ -344,6 +385,7 @@ export function SellForm() {
                       <div className="space-y-2">
                         <Label htmlFor="duration">
                           Listing Duration <span className="text-red-500">*</span>
+                          <span className="ml-2 text-xs text-zinc-500">(Fill in at least one field)</span>
                         </Label>
                         <div className="grid grid-cols-3 gap-2">
                           <div>
@@ -351,11 +393,15 @@ export function SellForm() {
                               <Input
                                 id="durationDays"
                                 name="durationDays"
-                                type="number"
-                                min="0"
+                                type="text"
+                                pattern="[0-9]*"
+                                inputMode="numeric"
                                 value={formData.durationDays}
+                                defaultValue=""
                                 onChange={handleInputChange}
+                                onFocus={handleFocus}
                                 className="border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500"
+                                placeholder="0"
                               />
                               <Label htmlFor="durationDays" className="whitespace-nowrap">Days</Label>
                             </div>
@@ -365,12 +411,15 @@ export function SellForm() {
                               <Input
                                 id="durationHours"
                                 name="durationHours"
-                                type="number"
-                                min="0"
-                                max="23"
+                                type="text"
+                                pattern="[0-9]*"
+                                inputMode="numeric"
                                 value={formData.durationHours}
+                                defaultValue=""
                                 onChange={handleInputChange}
+                                onFocus={handleFocus}
                                 className="border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500"
+                                placeholder="0"
                               />
                               <Label htmlFor="durationHours" className="whitespace-nowrap">Hours</Label>
                             </div>
@@ -380,12 +429,15 @@ export function SellForm() {
                               <Input
                                 id="durationMinutes"
                                 name="durationMinutes"
-                                type="number"
-                                min="0"
-                                max="59"
+                                type="text"
+                                pattern="[0-9]*"
+                                inputMode="numeric"
                                 value={formData.durationMinutes}
+                                defaultValue=""
                                 onChange={handleInputChange}
+                                onFocus={handleFocus}
                                 className="border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500"
+                                placeholder="0"
                               />
                               <Label htmlFor="durationMinutes" className="whitespace-nowrap">Minutes</Label>
                             </div>
@@ -408,10 +460,11 @@ export function SellForm() {
                           <Input
                             id="startingBid"
                             name="startingBid"
-                            type="number"
-                            step="0.01"
-                            min="0"
+                            type="text"
+                            pattern="[0-9]*\.?[0-9]*"
+                            inputMode="decimal"
                             value={formData.startingBid}
+                            defaultValue=""
                             onChange={handleInputChange}
                             className={`pl-8 border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500 ${
                               formErrors?.startingBid ? "border-red-500" : ""
@@ -431,10 +484,11 @@ export function SellForm() {
                           <Input
                             id="bidIncrement"
                             name="bidIncrement"
-                            type="number"
-                            step="0.01"
-                            min="0"
+                            type="text"
+                            pattern="[0-9]*\.?[0-9]*"
+                            inputMode="decimal"
                             value={formData.bidIncrement}
+                            defaultValue=""
                             onChange={handleInputChange}
                             className={`pl-8 border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500 ${
                               formErrors?.bidIncrement ? "border-red-500" : ""
@@ -452,10 +506,11 @@ export function SellForm() {
                           <Input
                             id="maxBid"
                             name="maxBid"
-                            type="number"
-                            step="0.01"
-                            min="0"
+                            type="text"
+                            pattern="[0-9]*\.?[0-9]*"
+                            inputMode="decimal"
                             value={formData.maxBid}
+                            defaultValue=""
                             onChange={handleInputChange}
                             className="pl-8 border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500"
                             placeholder="0.00"
@@ -470,6 +525,7 @@ export function SellForm() {
                       <div className="space-y-2">
                         <Label htmlFor="duration">
                           Auction Duration <span className="text-red-500">*</span>
+                          <span className="ml-2 text-xs text-zinc-500">(Fill in at least one field)</span>
                         </Label>
                         <div className="grid grid-cols-3 gap-2">
                           <div>
@@ -477,11 +533,15 @@ export function SellForm() {
                               <Input
                                 id="durationDays"
                                 name="durationDays"
-                                type="number"
-                                min="0"
+                                type="text"
+                                pattern="[0-9]*"
+                                inputMode="numeric"
                                 value={formData.durationDays}
+                                defaultValue=""
                                 onChange={handleInputChange}
+                                onFocus={handleFocus}
                                 className="border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500"
+                                placeholder="0"
                               />
                               <Label htmlFor="durationDays" className="whitespace-nowrap">Days</Label>
                             </div>
@@ -491,12 +551,15 @@ export function SellForm() {
                               <Input
                                 id="durationHours"
                                 name="durationHours"
-                                type="number"
-                                min="0"
-                                max="23"
+                                type="text"
+                                pattern="[0-9]*"
+                                inputMode="numeric"
                                 value={formData.durationHours}
+                                defaultValue=""
                                 onChange={handleInputChange}
+                                onFocus={handleFocus}
                                 className="border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500"
+                                placeholder="0"
                               />
                               <Label htmlFor="durationHours" className="whitespace-nowrap">Hours</Label>
                             </div>
@@ -506,12 +569,15 @@ export function SellForm() {
                               <Input
                                 id="durationMinutes"
                                 name="durationMinutes"
-                                type="number"
-                                min="0"
-                                max="59"
+                                type="text"
+                                pattern="[0-9]*"
+                                inputMode="numeric"
                                 value={formData.durationMinutes}
+                                defaultValue=""
                                 onChange={handleInputChange}
+                                onFocus={handleFocus}
                                 className="border-zinc-700 bg-zinc-800/50 text-white focus:border-violet-500 focus:ring-violet-500"
+                                placeholder="0"
                               />
                               <Label htmlFor="durationMinutes" className="whitespace-nowrap">Minutes</Label>
                             </div>

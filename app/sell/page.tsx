@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, ChangeEvent } from 'react'
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -49,7 +49,7 @@ const auctionSchema = z.object({
   const totalMinutes = (data.durationDays * 24 * 60) + (data.durationHours * 60) + data.durationMinutes;
   return totalMinutes > 0;
 }, {
-  message: "Duration must be greater than zero",
+  message: "At least one duration field must be filled with a value greater than 0",
   path: ["durationDays"]
 });
 
@@ -62,6 +62,22 @@ export default function SellPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [formType, setFormType] = useState<'fixed' | 'auction'>('fixed')
 
+  // Handle leading zeros in numeric inputs
+  const handleNumericInput = (e: ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const value = input.value;
+    
+    // Skip empty inputs or values with decimal point at the end
+    if (value === "" || value === ".") return;
+    
+    // For inputs that start with "0" but aren't decimal values (like "0.")
+    if (value.length > 1 && value.startsWith('0') && value.charAt(1) !== '.') {
+      // Remove leading zeros
+      const newValue = value.replace(/^0+/, '');
+      input.value = newValue;
+    }
+  };
+
   // Fixed price form
   const fixedPriceForm = useForm<FixedPriceFormData>({
     resolver: zodResolver(fixedPriceSchema),
@@ -71,7 +87,7 @@ export default function SellPage() {
       longDescription: "",
       category: "insta",
       assetType: "username",
-      price: 0,
+      price: undefined,
       status: "active"
     }
   })
@@ -85,7 +101,7 @@ export default function SellPage() {
       longDescription: "",
       category: "insta",
       assetType: "username",
-      startingBid: 0,
+      startingBid: undefined,
       durationDays: 0,
       durationHours: 0,
       durationMinutes: 0,
@@ -150,10 +166,23 @@ export default function SellPage() {
       return
     }
 
+    // Custom validation to allow any combination of duration fields
+    const days = data.durationDays || 0;
+    const hours = data.durationHours || 0;
+    const minutes = data.durationMinutes || 0;
+    const totalMinutes = (days * 24 * 60) + (hours * 60) + minutes;
+    
+    if (totalMinutes <= 0) {
+      auctionForm.setError("durationDays", {
+        type: "custom",
+        message: "At least one duration field must be filled with a value greater than 0"
+      });
+      return;
+    }
+
     setIsLoading(true)
     try {
       // Calculate expiration date based on duration
-      const totalMinutes = (data.durationDays * 24 * 60) + (data.durationHours * 60) + data.durationMinutes
       const expirationDate = new Date()
       expirationDate.setMinutes(expirationDate.getMinutes() + totalMinutes)
 
@@ -309,11 +338,14 @@ export default function SellPage() {
                         <Label htmlFor="fixed-price">Price ($)</Label>
                         <Input
                           id="fixed-price"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="Fixed price"
-                          {...fixedPriceForm.register("price", { valueAsNumber: true })}
+                          type="text"
+                          pattern="[0-9]*\.?[0-9]*"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          {...fixedPriceForm.register("price", { 
+                            onChange: handleNumericInput,
+                            setValueAs: (value) => value === "" ? undefined : parseFloat(value)
+                          })}
                           className={`bg-zinc-800/50 border-zinc-700 focus:border-violet-500 ${
                             fixedPriceForm.formState.errors.price ? "border-red-500" : ""
                           }`}
@@ -449,11 +481,14 @@ export default function SellPage() {
                         <Label htmlFor="auction-startingBid">Starting Bid ($)</Label>
                         <Input
                           id="auction-startingBid"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="Starting bid amount"
-                          {...auctionForm.register("startingBid", { valueAsNumber: true })}
+                          type="text"
+                          pattern="[0-9]*\.?[0-9]*"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          {...auctionForm.register("startingBid", { 
+                            onChange: handleNumericInput,
+                            setValueAs: (value) => value === "" ? undefined : parseFloat(value)
+                          })}
                           className={`bg-zinc-800/50 border-zinc-700 focus:border-violet-500 ${
                             auctionForm.formState.errors.startingBid ? "border-red-500" : ""
                           }`}
@@ -465,16 +500,23 @@ export default function SellPage() {
                       
                       {/* Duration */}
                       <div className="space-y-2">
-                        <Label htmlFor="auction-duration">Auction Duration</Label>
+                        <Label htmlFor="auction-duration">
+                          Auction Duration <span className="text-red-500">*</span>
+                          <span className="ml-2 text-xs text-zinc-500">(Fill in at least one field)</span>
+                        </Label>
                         <div className="grid grid-cols-3 gap-2">
                           <div>
                             <div className="flex items-center space-x-2">
                               <Input
                                 id="auction-durationDays"
-                                type="number"
-                                min="0"
+                                type="text"
+                                pattern="[0-9]*"
+                                inputMode="numeric"
                                 placeholder="0"
-                                {...auctionForm.register("durationDays", { valueAsNumber: true })}
+                                {...auctionForm.register("durationDays", { 
+                                  onChange: handleNumericInput,
+                                  setValueAs: (value) => value === "" ? 0 : parseInt(value)
+                                })}
                                 className={`bg-zinc-800/50 border-zinc-700 focus:border-violet-500 ${
                                   auctionForm.formState.errors.durationDays ? "border-red-500" : ""
                                 }`}
@@ -486,12 +528,17 @@ export default function SellPage() {
                             <div className="flex items-center space-x-2">
                               <Input
                                 id="auction-durationHours"
-                                type="number"
-                                min="0"
-                                max="23"
+                                type="text"
+                                pattern="[0-9]*"
+                                inputMode="numeric"
                                 placeholder="0"
-                                {...auctionForm.register("durationHours", { valueAsNumber: true })}
-                                className="bg-zinc-800/50 border-zinc-700 focus:border-violet-500"
+                                {...auctionForm.register("durationHours", { 
+                                  onChange: handleNumericInput,
+                                  setValueAs: (value) => value === "" ? 0 : parseInt(value)
+                                })}
+                                className={`bg-zinc-800/50 border-zinc-700 focus:border-violet-500 ${
+                                  auctionForm.formState.errors.durationDays ? "border-red-500" : ""
+                                }`}
                               />
                               <Label htmlFor="auction-durationHours" className="whitespace-nowrap">Hours</Label>
                             </div>
@@ -500,19 +547,26 @@ export default function SellPage() {
                             <div className="flex items-center space-x-2">
                               <Input
                                 id="auction-durationMinutes"
-                                type="number"
-                                min="0"
-                                max="59"
+                                type="text"
+                                pattern="[0-9]*"
+                                inputMode="numeric"
                                 placeholder="0"
-                                {...auctionForm.register("durationMinutes", { valueAsNumber: true })}
-                                className="bg-zinc-800/50 border-zinc-700 focus:border-violet-500"
+                                {...auctionForm.register("durationMinutes", { 
+                                  onChange: handleNumericInput,
+                                  setValueAs: (value) => value === "" ? 0 : parseInt(value)
+                                })}
+                                className={`bg-zinc-800/50 border-zinc-700 focus:border-violet-500 ${
+                                  auctionForm.formState.errors.durationDays ? "border-red-500" : ""
+                                }`}
                               />
                               <Label htmlFor="auction-durationMinutes" className="whitespace-nowrap">Min</Label>
                             </div>
                           </div>
                         </div>
                         {auctionForm.formState.errors.durationDays && (
-                          <p className="text-sm text-red-500">{auctionForm.formState.errors.durationDays.message}</p>
+                          <p className="text-sm text-red-500">
+                            {auctionForm.formState.errors.durationDays.message}
+                          </p>
                         )}
                       </div>
                       
