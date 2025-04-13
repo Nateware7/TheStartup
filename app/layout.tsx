@@ -9,6 +9,7 @@ import { EnhancedFooter } from "@/components/enhanced-footer"
 import { AnimatedBackground } from "@/components/animated-background"
 import { AuthProvider } from "@/hooks/use-auth"
 import { NotificationProvider } from "@/hooks/use-notifications"
+import { Toaster as HotToaster } from 'react-hot-toast'
 
 const inter = Inter({
   subsets: ["latin"],
@@ -56,6 +57,16 @@ export default function RootLayout({
                 </div>
               </AnimatedBackground>
               <Toaster />
+              <HotToaster 
+                position="top-center"
+                toastOptions={{
+                  style: {
+                    background: '#333',
+                    color: '#fff',
+                    border: '1px solid #444'
+                  }
+                }}
+              />
             </NotificationProvider>
           </AuthProvider>
         </ThemeProvider>

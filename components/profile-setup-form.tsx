@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Input } from "@/components/ui/input";
 import { auth, db } from '@/lib/firebaseConfig';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { Cloudinary } from "@cloudinary/url-gen";
@@ -36,6 +36,7 @@ export function ProfileSetupForm() {
 
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
   
   // State for image croppers and previews
   const [profileCropperOpen, setProfileCropperOpen] = useState(false);
@@ -112,9 +113,22 @@ export function ProfileSetupForm() {
 
   const onSubmit = async (data: FormData) => {
     setIsLoading(true);
+    setUsernameError(null); // Clear previous username errors
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("User not authenticated");
+      
+      // Check if username is already taken
+      const usersRef = collection(db, 'users');
+      const usernameQuery = query(usersRef, where("username", "==", data.username));
+      const querySnapshot = await getDocs(usernameQuery);
+      
+      if (!querySnapshot.empty) {
+        setUsernameError('Username is already taken. Please choose a different one.');
+        toast.error('Username is already taken. Please choose a different one.');
+        setIsLoading(false);
+        return;
+      }
       
       // Prepare update data
       const updateData: Record<string, any> = {
@@ -154,6 +168,16 @@ export function ProfileSetupForm() {
 
   return (
     <>
+      {usernameError && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-md">
+          <p className="text-red-500 font-medium flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            {usernameError}
+          </p>
+        </div>
+      )}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="space-y-2">
           <label htmlFor="username" className="block text-sm font-medium text-zinc-300">
@@ -164,8 +188,11 @@ export function ProfileSetupForm() {
             type="text"
             placeholder="Enter your username"
             {...register("username")}
-            className={`bg-zinc-900/50 border-zinc-800 focus:border-violet-500 ${errors.username ? "border-red-500" : ""}`}
+            className={`bg-zinc-900/50 border-zinc-800 focus:border-violet-500 ${errors.username || usernameError ? "border-red-500" : ""}`}
           />
+          <p className="text-xs text-zinc-400">
+            Choose carefully! Usernames are permanent and cannot be changed after your profile is created.
+          </p>
           {errors.username && <p className="text-sm text-red-500">{errors.username.message}</p>}
         </div>
 

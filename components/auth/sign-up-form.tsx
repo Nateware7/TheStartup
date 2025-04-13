@@ -232,6 +232,9 @@ export function SignUpForm() {
             "Create Account"
           )}
         </motion.button>
+        <p className="mt-2 text-xs text-zinc-400 text-center">
+          After registration, you'll set up your profile with a unique username that cannot be changed later.
+        </p>
       </div>
     </form>
   )

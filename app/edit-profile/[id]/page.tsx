@@ -202,7 +202,6 @@ function EditProfileContent({ userId }: { userId: string }) {
       
       // Prepare update data
       const updateData: Record<string, any> = {
-        username: data.username,
         bio: data.bio || '',
         location: data.location || '',
         updatedAt: new Date(),
@@ -373,8 +372,10 @@ function EditProfileContent({ userId }: { userId: string }) {
                       type="text"
                       placeholder="Enter your username"
                       {...register("username")}
-                      className={`bg-zinc-800/50 border-zinc-700 focus:border-violet-500 ${errors.username ? "border-red-500" : ""}`}
+                      disabled={true}
+                      className={`bg-zinc-800/50 border-zinc-700 focus:border-violet-500 ${errors.username ? "border-red-500" : ""} cursor-not-allowed opacity-70`}
                     />
+                    <p className="text-xs text-zinc-400">Usernames cannot be changed after account creation.</p>
                     {errors.username && <p className="text-sm text-red-500">{errors.username.message}</p>}
                   </div>
                   
