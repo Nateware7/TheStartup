@@ -26,7 +26,6 @@ type UserData = {
   bio: string
   isVerified: boolean
   createdAt: Date
-  location: string
   sales: number
   followers: number
   following: number
@@ -115,7 +114,6 @@ function UserProfileContent({ userId }: { userId: string }) {
             bio: userData.bio || "No bio available",
             isVerified: userData.isVerified || false,
             createdAt,
-            location: userData.location || "Unknown location",
             sales: userData.sales || 0, // Keep this as fallback
             followers: userData.followers || 0,
             following: userData.following || 0,
@@ -186,7 +184,6 @@ function UserProfileContent({ userId }: { userId: string }) {
               bio: userData.bio || "No bio available",
               isVerified: userData.isVerified || false,
               createdAt,
-              location: userData.location || "Unknown location",
               sales: userData.sales || 0, // Keep this as fallback
               followers: userData.followers || 0,
               following: userData.following || 0,

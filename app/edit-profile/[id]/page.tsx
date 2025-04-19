@@ -29,7 +29,6 @@ const cld = new Cloudinary({
 const formSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   bio: z.string().max(150, "Bio must be less than 150 characters").optional(),
-  location: z.string().max(50, "Location must be less than 50 characters").optional(),
   banner: z.any(),
   profilePicture: z.any(),
 })
@@ -68,7 +67,6 @@ function EditProfileContent({ userId }: { userId: string }) {
     defaultValues: {
       username: '',
       bio: '',
-      location: '',
     }
   })
   
@@ -112,7 +110,6 @@ function EditProfileContent({ userId }: { userId: string }) {
           // Set form default values
           setValue('username', userData.username || '')
           setValue('bio', userData.bio || '')
-          setValue('location', userData.location || '')
           
           // Set image previews
           setBannerPreview(userData.banner || null)
@@ -203,7 +200,6 @@ function EditProfileContent({ userId }: { userId: string }) {
       // Prepare update data
       const updateData: Record<string, any> = {
         bio: data.bio || '',
-        location: data.location || '',
         updatedAt: new Date(),
       }
 
@@ -211,11 +207,17 @@ function EditProfileContent({ userId }: { userId: string }) {
       if (croppedBannerBlob) {
         const bannerUrl = await uploadToCloudinary(croppedBannerBlob, `users/${user.uid}/banners`)
         if (bannerUrl) updateData.banner = bannerUrl
+      } else if (!bannerPreview) {
+        // Set a plain black background if the user removed their current banner
+        updateData.banner = `https://placehold.co/1200x300/000000/000000`
       }
 
       if (croppedProfileBlob) {
         const profileUrl = await uploadToCloudinary(croppedProfileBlob, `users/${user.uid}/profiles`)
         if (profileUrl) updateData.profilePicture = profileUrl
+      } else if (!profilePreview) {
+        // Use a simple default profile image
+        updateData.profilePicture = `https://placehold.co/400x400/333333/FFFFFF`
       }
 
       // Update Firestore document with available data
@@ -393,21 +395,6 @@ function EditProfileContent({ userId }: { userId: string }) {
                     />
                     {errors.bio && <p className="text-sm text-red-500">{errors.bio.message}</p>}
                     <p className="text-xs text-zinc-400">Brief description shown on your profile. Maximum 150 characters.</p>
-                  </div>
-                  
-                  {/* Location */}
-                  <div className="space-y-2">
-                    <label htmlFor="location" className="block text-sm font-medium text-zinc-300">
-                      Location
-                    </label>
-                    <Input
-                      id="location"
-                      type="text"
-                      placeholder="City, Country"
-                      {...register("location")}
-                      className={`bg-zinc-800/50 border-zinc-700 focus:border-violet-500 ${errors.location ? "border-red-500" : ""}`}
-                    />
-                    {errors.location && <p className="text-sm text-red-500">{errors.location.message}</p>}
                   </div>
                   
                   {/* Action Buttons */}

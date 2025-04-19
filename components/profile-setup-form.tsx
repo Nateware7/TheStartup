@@ -142,16 +142,16 @@ export function ProfileSetupForm() {
         const bannerUrl = await uploadToCloudinary(croppedBannerBlob, `users/${user.uid}/banners`);
         if (bannerUrl) updateData.banner = bannerUrl;
       } else {
-        // Use placeholder if no image uploaded
-        updateData.banner = `https://placehold.co/1200x300/36393f/FFFFFF?text=${data.username}+Banner`;
+        // Use a plain black placeholder
+        updateData.banner = `https://placehold.co/1200x300/000000/000000`;
       }
 
       if (croppedProfileBlob) {
         const profileUrl = await uploadToCloudinary(croppedProfileBlob, `users/${user.uid}/profiles`);
         if (profileUrl) updateData.profilePicture = profileUrl;
       } else {
-        // Use placeholder if no image uploaded
-        updateData.profilePicture = `https://placehold.co/400x400/36393f/FFFFFF?text=${data.username.charAt(0).toUpperCase()}`;
+        // Use a simple default profile image
+        updateData.profilePicture = `https://placehold.co/400x400/333333/FFFFFF`;
       }
 
       // Update Firestore document with available data

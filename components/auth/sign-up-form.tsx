@@ -85,7 +85,6 @@ export function SignUpForm() {
         isVerified: false,
         profilePicture: '',
         bio: '',
-        location: '',
         followers: 0,
         following: 0,
         sales: 0,
