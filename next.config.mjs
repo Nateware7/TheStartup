@@ -23,9 +23,15 @@ const nextConfig = {
     unoptimized: true,
   },
   experimental: {
-    webpackBuildWorker: true,
-    parallelServerBuildTraces: true,
-    parallelServerCompiles: true,
+    // Disabling all experimental features to avoid compatibility issues
+    webpackBuildWorker: false,
+    parallelServerBuildTraces: false,
+    parallelServerCompiles: false,
+  },
+  webpack: (config, { isServer }) => {
+    // Workaround for webpack error
+    config.optimization.minimize = false; // Disable minification temporarily
+    return config;
   },
 }
 
