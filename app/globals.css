@@ -1,9 +1,4 @@
 /* Import Tailwind */
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
-
-/* Then include the directives for environments that support them */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

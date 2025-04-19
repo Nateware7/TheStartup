@@ -29,8 +29,35 @@ const nextConfig = {
     parallelServerCompiles: false,
   },
   webpack: (config, { isServer }) => {
-    // Workaround for webpack error
+    // Configure webpack to properly handle CSS files with PostCSS
     config.optimization.minimize = false; // Disable minification temporarily
+    
+    // Make sure PostCSS plugins are applied correctly
+    const rules = config.module.rules;
+    const cssRules = rules.find(rule => 
+      rule.oneOf && Array.isArray(rule.oneOf) && 
+      rule.oneOf.some(oneof => 
+        oneof.test && oneof.test.toString().includes('css')
+      )
+    );
+    
+    if (cssRules && cssRules.oneOf) {
+      cssRules.oneOf.forEach(rule => {
+        if (rule.test && rule.test.toString().includes('css')) {
+          // Ensure rule.use is defined and includes postcss-loader
+          if (rule.use && Array.isArray(rule.use)) {
+            rule.use.forEach(loader => {
+              if (loader.loader && loader.loader.includes('postcss-loader')) {
+                // Make sure postcss-loader is configured correctly
+                if (!loader.options) loader.options = {};
+                if (!loader.options.postcssOptions) loader.options.postcssOptions = {};
+              }
+            });
+          }
+        }
+      });
+    }
+    
     return config;
   },
 }
